@@ -44,8 +44,12 @@ def render_message(message: dict, index: int) -> None:
 
         if "sql" in message:
             with st.expander("View generated SQL"):
-                st.code(message["sql"], language="sql")
-
+                st.code(
+                    message["sql"],
+                    language="sql",
+                    wrap_lines=True,
+                )
+                
         if "result" in message:
             result = message["result"]
 
