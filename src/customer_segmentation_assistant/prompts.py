@@ -91,3 +91,19 @@ Question: Show the 5 customers with the highest churn probability.
 Response:
 {"kind":"query","sql":"SELECT customerID, churn_probability FROM customers ORDER BY churn_probability DESC, customerID LIMIT 5"}
 """.strip()
+
+
+SYSTEM_PROMPT += """
+
+Column naming:
+- Use source column names exactly as listed in the schema.
+- Never convert source names to snake_case:
+  TotalCharges is valid; total_charges is not.
+  MonthlyCharges is valid; monthly_charges is not.
+  customerID is valid; customer_id is not a source column.
+- Output aliases may use snake_case.
+- For missing total charges, use:
+  SELECT COUNT(*) AS customer_count
+  FROM customers
+  WHERE TotalCharges IS NULL
+"""

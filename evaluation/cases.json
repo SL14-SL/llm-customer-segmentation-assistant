@@ -2,22 +2,26 @@
   {
     "id": "count_customers",
     "question": "How many customers are in the dataset?",
-    "expected_sql": "SELECT COUNT(*) AS customer_count FROM customers"
+    "expected_sql": "SELECT COUNT(*) AS customer_count FROM customers",
+    "order_matters": false
   },
   {
     "id": "high_risk_monthly_contracts",
     "question": "Show the 10 customers with the highest churn probability who have a month-to-month contract and a churn probability of at least 50%.",
-    "expected_sql": "SELECT customerID AS customer_id, churn_probability FROM customers WHERE Contract = 'Month-to-month' AND churn_probability >= 0.5 ORDER BY churn_probability DESC, customerID LIMIT 10"
+    "expected_sql": "SELECT customerID AS customer_id, churn_probability FROM customers WHERE Contract = 'Month-to-month' AND churn_probability >= 0.5 ORDER BY churn_probability DESC, customerID LIMIT 10",
+    "order_matters": true
   },
   {
     "id": "missing_total_charges",
     "question": "How many customers have missing total charges?",
-    "expected_sql": "SELECT COUNT(*) AS customer_count FROM customers WHERE TotalCharges IS NULL"
+    "expected_sql": "SELECT COUNT(*) AS customer_count FROM customers WHERE TotalCharges IS NULL",
+    "order_matters": false
   },
   {
     "id": "average_risk_by_contract",
     "question": "What is the average churn probability for each contract type?",
-    "expected_sql": "SELECT Contract AS contract, AVG(churn_probability) AS avg_churn_probability FROM customers GROUP BY Contract ORDER BY Contract"
+    "expected_sql": "SELECT Contract AS contract, AVG(churn_probability) AS avg_churn_probability FROM customers GROUP BY Contract ORDER BY Contract",
+    "order_matters": false
   },
   {
     "id": "high_risk_undefined",
