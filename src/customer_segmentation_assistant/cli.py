@@ -1,12 +1,33 @@
 """Ask customer segmentation questions from the terminal."""
-
 import argparse
+from datetime import UTC, datetime
+from pathlib import Path
 
 from customer_segmentation_assistant.database import query_dataframe
 from customer_segmentation_assistant.decisions import ClarificationDecision
+from customer_segmentation_assistant.export import export_csv
 from customer_segmentation_assistant.llm import DEFAULT_MODEL, generate_decision
 
 MAX_CLARIFICATIONS = 3
+
+
+def offer_export(result) -> None:
+    """Export the displayed result only after explicit confirmation."""
+    try:
+        answer = input("\nExport this result as CSV? [y/N]: ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\nExport cancelled.")
+        return
+
+    if answer != "y":
+        print("No export created.")
+        return
+
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    destination = Path("data/exports") / f"segment_{timestamp}.csv"
+
+    export_csv(result, destination)
+    print(f"Export saved: {destination}")
 
 
 def main() -> None:
@@ -46,6 +67,7 @@ def main() -> None:
                 print("No matching customers.")
             else:
                 print(result.to_string(index=False))
+                offer_export(result)
             return
 
         print(f"\nClarification: {decision.question}")
