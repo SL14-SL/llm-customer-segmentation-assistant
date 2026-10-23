@@ -6,6 +6,13 @@ Ask questions in English, clarify ambiguous criteria, inspect the generated SQL,
 and download query results as CSV. The assistant runs locally using Ollama,
 DuckDB, and Streamlit. No external LLM API account is required.
 
+
+## Project onepager
+
+- [English case study](docs/llm_customer_segmentation_case_study_en.pdf)
+- [Deutsche Projektübersicht](docs/llm_customer_segmentation_case_study_de.pdf)
+
+
 ## Demo
 
 ### Find customer segments
