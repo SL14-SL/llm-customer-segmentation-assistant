@@ -1,0 +1,13 @@
+
+# Local environments and secrets
+.venv/
+.env
+.env.*
+!.env.example
+.python-version
+
+# Generated data
+data/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
