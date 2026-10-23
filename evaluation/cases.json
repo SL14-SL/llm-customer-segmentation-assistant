@@ -28,5 +28,23 @@
     "question": "Show me high-risk customers.",
     "expected_behavior": "clarify",
     "clarification_topic": "Ask which minimum churn probability defines high risk."
+  },
+  {
+    "id": "count_long_tenure_low_risk",
+    "question": "How many customers have been with the company for at least 24 months and have a churn probability below 20%?",
+    "expected_sql": "SELECT COUNT(*) AS customer_count FROM customers WHERE tenure >= 24 AND churn_probability < 0.2",
+    "order_matters": false
+  },
+  {
+    "id": "action_distribution",
+    "question": "How many customers are assigned to each recommended action?",
+    "expected_sql": "SELECT action, COUNT(*) AS customer_count FROM customers GROUP BY action",
+    "order_matters": false
+  },
+  {
+    "id": "highest_monthly_charges",
+    "question": "Show the 5 customers with the highest monthly charges. Return their customer ID and monthly charges. Break ties by customer ID in ascending order.",
+    "expected_sql": "SELECT customerID, MonthlyCharges FROM customers ORDER BY MonthlyCharges DESC, customerID ASC LIMIT 5",
+    "order_matters": true
   }
 ]
