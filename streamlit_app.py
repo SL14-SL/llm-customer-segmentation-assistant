@@ -70,8 +70,8 @@ def render_message(message: dict, index: int) -> None:
             with st.expander("Error details"):
                 st.code(message["error"], language=None)
 
-        if "duration" in message:
-            st.caption(f"Completed in {message['duration']:.1f} seconds")
+        # if "duration" in message:
+        #     st.caption(f"Completed in {message['duration']:.1f} seconds")
 
 
 def process_question(question: str) -> dict:
@@ -91,7 +91,7 @@ def process_question(question: str) -> dict:
     )
 
     decision = generate_decision(current_request)
-    
+
     if isinstance(decision, UnsupportedDecision):
         st.session_state.pending_context = []
         st.session_state.clarification_count = 0
