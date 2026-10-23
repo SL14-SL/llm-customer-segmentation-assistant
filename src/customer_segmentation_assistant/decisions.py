@@ -15,8 +15,13 @@ class QueryDecision:
 class ClarificationDecision:
     question: str
 
+@dataclass(frozen=True)
+class UnsupportedDecision:
+    message: str
 
-def parse_decision(raw: str) -> QueryDecision | ClarificationDecision:
+def parse_decision(
+    raw: str,
+) -> QueryDecision | ClarificationDecision | UnsupportedDecision:
     """Accept exactly one supported decision from a JSON response."""
     try:
         payload = json.loads(raw)
@@ -32,6 +37,8 @@ def parse_decision(raw: str) -> QueryDecision | ClarificationDecision:
         field = "sql"
     elif kind == "clarification":
         field = "question"
+    elif kind == "unsupported":
+        field = "message"
     else:
         raise ValueError("Unknown decision kind.")
 
@@ -48,5 +55,8 @@ def parse_decision(raw: str) -> QueryDecision | ClarificationDecision:
     if kind == "query":
         validate_sql(value)
         return QueryDecision(sql=value)
+
+    if kind == "unsupported":
+        return UnsupportedDecision(message=value)
 
     return ClarificationDecision(question=value)

@@ -4,7 +4,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from customer_segmentation_assistant.database import query_dataframe
-from customer_segmentation_assistant.decisions import ClarificationDecision
+from customer_segmentation_assistant.decisions import (
+    ClarificationDecision,
+    UnsupportedDecision,
+)
 from customer_segmentation_assistant.export import export_csv
 from customer_segmentation_assistant.llm import DEFAULT_MODEL, generate_decision
 
@@ -58,6 +61,10 @@ def main() -> None:
             model=args.model,
         )
 
+        if isinstance(decision, UnsupportedDecision):
+            print(f"\nNot supported: {decision.message}")
+            return
+        
         if not isinstance(decision, ClarificationDecision):
             print(f"\nSQL:\n{decision.sql}")
             result = query_dataframe(decision.sql)

@@ -7,6 +7,7 @@ import pytest
 from customer_segmentation_assistant.decisions import (
     ClarificationDecision,
     QueryDecision,
+    UnsupportedDecision,
     parse_decision,
 )
 
@@ -47,3 +48,30 @@ def test_accepts_clarification():
 def test_rejects_invalid_response(raw):
     with pytest.raises(ValueError):
         parse_decision(raw)
+
+
+def test_accepts_unsupported_response():
+    message = "Weather information is not available."
+
+    decision = parse_decision(
+        json.dumps({"kind": "unsupported", "message": message})
+    )
+
+    assert decision == UnsupportedDecision(message=message)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"kind": "unsupported", "message": ""},
+        {"kind": "unsupported", "message": 123},
+        {
+            "kind": "unsupported",
+            "message": "Unavailable.",
+            "sql": "SELECT * FROM customers",
+        },
+    ],
+)
+def test_rejects_invalid_unsupported_response(payload):
+    with pytest.raises(ValueError):
+        parse_decision(json.dumps(payload))

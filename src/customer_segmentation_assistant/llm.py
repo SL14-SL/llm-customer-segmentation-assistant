@@ -6,6 +6,7 @@ from urllib.request import Request, urlopen
 from customer_segmentation_assistant.decisions import (
     ClarificationDecision,
     QueryDecision,
+    UnsupportedDecision,
     parse_decision,
 )
 from customer_segmentation_assistant.prompts import SYSTEM_PROMPT
@@ -35,6 +36,18 @@ DECISION_SCHEMA = {
             "required": ["kind", "question"],
             "additionalProperties": False,
         },
+        {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string",
+                    "enum": ["unsupported"],
+                },
+                "message": {"type": "string"},
+            },
+            "required": ["kind", "message"],
+            "additionalProperties": False,
+        },
     ]
 }
 
@@ -43,7 +56,7 @@ def generate_decision(
     question: str,
     *,
     model: str = DEFAULT_MODEL,
-) -> QueryDecision | ClarificationDecision:
+) -> QueryDecision | ClarificationDecision | UnsupportedDecision:
     """Generate one decision without executing SQL."""
     if not question.strip():
         raise ValueError("Question must not be empty.")
