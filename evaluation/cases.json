@@ -46,5 +46,12 @@
     "question": "Show the 5 customers with the highest monthly charges. Return their customer ID and monthly charges. Break ties by customer ID in ascending order.",
     "expected_sql": "SELECT customerID, MonthlyCharges FROM customers ORDER BY MonthlyCharges DESC, customerID ASC LIMIT 5",
     "order_matters": true
+  },
+  {
+    "id": "high_risk_after_clarification",
+    "question": "Show me high-risk customers.",
+    "clarification_answer": "At least 70% churn probability. Show the top 5.",
+    "expected_sql": "SELECT customerID, churn_probability FROM customers WHERE churn_probability >= 0.7 ORDER BY churn_probability DESC, customerID LIMIT 5",
+    "order_matters": true
   }
 ]

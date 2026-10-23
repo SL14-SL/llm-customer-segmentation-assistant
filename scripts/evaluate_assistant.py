@@ -28,6 +28,28 @@ def main() -> None:
         try:
             decision = generate_decision(case["question"])
 
+            if "clarification_answer" in case:
+                if not isinstance(decision, ClarificationDecision):
+                    raise AssertionError(
+                        "Expected a clarification before the follow-up answer."
+                    )
+
+                print(f"Initial clarification: {decision.question}")
+
+                context = [
+                    f"Original customer question: {case['question']}",
+                    f"Assistant clarification: {decision.question}",
+                    f"Customer answer: {case['clarification_answer']}",
+                ]
+                current_request = "\n\n".join(context)
+                current_request += (
+                    "\n\nResolve the current request using all customer answers "
+                    "above. Generate SQL if the missing information has been "
+                    "supplied."
+                )
+
+                decision = generate_decision(current_request)
+                
             if case.get("expected_behavior") == "clarify":
                 if not isinstance(decision, ClarificationDecision):
                     raise AssertionError("Expected a clarification.")
