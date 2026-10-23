@@ -107,3 +107,23 @@ Column naming:
   FROM customers
   WHERE TotalCharges IS NULL
 """
+
+SYSTEM_PROMPT += """
+
+Clarification handling:
+- The input may contain an original question and clarification exchanges.
+- Interpret all exchanges together as one current request.
+- Customer answers supply missing definitions and may update the request.
+- Use the latest explicit customer answer when requirements conflict.
+- Do not ask again for information already supplied.
+- If a risk threshold and requested customer count are supplied,
+  generate the SQL query using those values.
+
+Example clarification exchange:
+Original customer question: Show me high-risk customers.
+Assistant clarification: Which minimum churn probability defines high risk?
+Customer answer: At least 70% churn probability. Show the top 5.
+
+The request is now fully specified. Respond:
+{"kind":"query","sql":"SELECT customerID, churn_probability FROM customers WHERE churn_probability >= 0.7 ORDER BY churn_probability DESC, customerID LIMIT 5"}
+"""
