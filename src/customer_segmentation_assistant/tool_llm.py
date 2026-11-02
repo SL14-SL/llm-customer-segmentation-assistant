@@ -126,12 +126,12 @@ def parse_tool_decision(raw: str) -> dict[str, object]:
     }
 
 
-def generate_tool_decision(
+def extract_segment_criteria(
     question: str,
     *,
     model: str = DEFAULT_MODEL,
 ) -> dict[str, object]:
-    """Extract criteria and propose an action without executing it."""
+    """Extract supplied criteria without executing a tool."""
     if not question.strip():
         raise ValueError("Question must not be empty.")
 
@@ -167,4 +167,14 @@ def generate_tool_decision(
     if not isinstance(raw, str) or not raw.strip():
         raise ValueError("Local model returned no segment criteria.")
 
-    return parse_tool_decision(raw)
+    return parse_segment_criteria(raw)
+
+
+def generate_tool_decision(
+    question: str,
+    *,
+    model: str = DEFAULT_MODEL,
+) -> dict[str, object]:
+    """Extract criteria and determine the next action."""
+    criteria = extract_segment_criteria(question, model=model)
+    return parse_tool_decision(json.dumps(criteria))
