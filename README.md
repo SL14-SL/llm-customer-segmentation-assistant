@@ -1,35 +1,47 @@
 # Customer Segmentation Assistant
 
-Explore customer data and churn predictions through a local chat interface.
+Explore customer segments through two local interfaces powered by Ollama,
+DuckDB and Streamlit:
 
-Ask questions in English, clarify ambiguous criteria, inspect the generated SQL,
-and download query results as CSV. The assistant runs locally using Ollama,
-DuckDB, and Streamlit. No external LLM API account is required.
+- **Text-to-SQL assistant:** ask questions about a scored customer dataset,
+  clarify ambiguous criteria, inspect SQL and download query results.
+- **Bounded comparison demo:** compare synthetic customer segments through
+  validated tools, visible model actions and a computed report.
 
+Both interfaces run locally. No external LLM API account is required.
+
+## Choose an interface
+
+| Interface | Entry point | Data | Model responsibility |
+| --- | --- | --- | --- |
+| Text-to-SQL assistant | `streamlit_app.py` | Compatible scored customer export | Propose SQL, a clarification or an unsupported response |
+| Bounded comparison demo | `streamlit_agent_demo.py` | Six synthetic customers created locally | Extract criteria and select permitted next actions |
+
+For the comparison demo, complete Setup steps 1–2 and follow
+[Bounded comparison demo](#bounded-comparison-demo). No upstream churn export,
+Docker containers or cloud infrastructure is required.
 
 ## Project onepager
 
 - [English case study](docs/llm_customer_segmentation_case_study_en.pdf)
 - [Deutsche Projektübersicht](docs/llm_customer_segmentation_case_study_de.pdf)
 
+These case studies describe the original Text-to-SQL application. They do not
+serve as evidence for the newer comparison demo.
 
-## Demo
+## Text-to-SQL demo
 
 ### Find customer segments
 
 Ask for a customer segment using contract types, churn probabilities,
-monthly charges, tenure, or other available attributes.
-
-The interface displays the generated SQL alongside the query result.
+monthly charges, tenure or other available attributes. The interface displays
+SQL alongside the query result.
 
 ![Customer segmentation query with SQL and results](docs/images/customer-segmentation-query.png)
 
 ### Clarify ambiguous requests
 
-Risk categories have no predefined thresholds. When asked for
-“high-risk customers,” the assistant requests a definition before querying.
-
-For example:
+Risk categories have no predefined thresholds. For example:
 
 - **Question:** Show me high-risk customers.
 - **Clarification:** Which minimum churn probability should define high risk?
@@ -46,23 +58,23 @@ When a question requires unavailable information, it explains the limitation.
 
 ![Response explaining unavailable churn outcome data](docs/images/customer-segmentation-data-boundaries.png)
 
-## Features
+## Text-to-SQL features
 
 - Local browser-based chat interface and command-line interface
-- English questions translated into structured assistant decisions
-- Clarification questions for ambiguous customer criteria
+- English questions translated into structured decisions
+- Clarification questions for ambiguous criteria
 - Explicit responses for unsupported requests
-- SQL validation before database execution
+- SQL validation before execution
 - Read-only DuckDB connections
-- Queries restricted to the `customers` table and a supported SQL subset
+- Queries restricted to `customers` and a supported SQL subset
 - Inspectable SQL and tabular results
-- CSV downloads initiated by the user
+- User-initiated CSV downloads
 - Reference evaluation based on query results rather than SQL text
 
-## How it works
+## How the Text-to-SQL assistant works
 
-The language model interprets the request and proposes a decision.
-For query decisions, DuckDB executes the validated SQL and computes the result.
+The model interprets a request and proposes a decision. For query decisions,
+DuckDB executes the validated SQL and computes the result.
 
 ```mermaid
 flowchart TD
@@ -76,79 +88,101 @@ flowchart TD
     G --> H["Table and optional CSV download"]
 ```
 
-The model does not calculate the returned metrics or generate result rows.
+The model does not calculate returned metrics or generate result rows.
 Customer records are queried locally and are not included in the model prompt.
 
 ### Decision types
 
 | Type | Behavior |
 | --- | --- |
-| `query` | Validate the proposed SQL and execute it against the customer database |
-| `clarification` | Ask for missing criteria before generating a query |
-| `unsupported` | Explain that the request requires unavailable data or capabilities |
+| `query` | Validate the SQL and execute it against the customer database |
+| `clarification` | Ask for missing criteria |
+| `unsupported` | Explain that data or capabilities are unavailable |
 
 ### Customer-list behavior
 
-- Risk thresholds must be provided by the user.
+- Risk thresholds must be supplied by the user.
 - Without an explicit customer count, return all matching customers.
 - Requests such as “top 5” apply the requested limit.
 - Requests for “all” matching customers omit the limit.
 
-These are instructions to the model. SQL policy validation checks permitted
-operations, but does not independently verify that every criterion was
-interpreted correctly.
+These are model instructions. SQL validation checks permitted operations;
+it does not independently verify that every requested criterion was interpreted
+correctly. Inspect the displayed SQL.
 
 ## Technology
 
 | Component | Technology |
 | --- | --- |
-| Language model | `qwen2.5-coder:3b` |
+| Default language model | `qwen2.5-coder:3b` |
 | Local model serving | Ollama |
-| Web interface | Streamlit |
+| Web interfaces | Streamlit |
 | Query engine | DuckDB |
 | SQL parsing and validation | SQLGlot |
 | Data handling | pandas and PyArrow |
 | Environment and dependencies | uv |
 | Tests and linting | pytest and Ruff |
+| Comparison orchestration | Python state, validated tool dispatch and state-dependent JSON schemas |
+
+The comparison demo implements its loop directly in Python without an agent
+framework. Backend model functions accept a model argument; the demo interface
+uses the project default.
 
 ## Data
 
-The development dataset contains **6,734 customer records** exported from
-a separate customer churn prediction project.
+### Text-to-SQL dataset
 
-Customer attributes are combined with:
+The recorded development dataset contains **6,734 customer records** exported
+from a separate churn prediction project. Customer attributes are combined with:
 
 - Predicted churn probability
 - Recommended retention action
 - Estimated customer value and action value
 - Scoring timestamp
-- Model name, model version, training run ID, and serving release ID
+- Model name, model version, training run ID and serving release ID
 
-The recorded export uses model version **5** of
-`churn-prediction-model-dev`.
+The recorded export uses model version **5** of `churn-prediction-model-dev`.
+The observed `Churn` label is excluded. Ten records have missing `TotalCharges`
+values, represented as SQL NULL.
 
-The observed `Churn` label is excluded. Ten records have missing
-`TotalCharges` values, represented as SQL NULL.
+These scores are demonstration inputs. This project does not evaluate the
+predictive performance of the upstream model. Once exported, the dataset can
+be used without running the upstream churn service.
 
-These scores serve as demonstration inputs. This project does not evaluate
-the predictive performance of the upstream churn model.
+### Synthetic comparison data
 
-Customer datasets, database files, and generated exports are excluded
-from Git. The README screenshots show selected demonstration results.
+The comparison demo uses six synthetic customers with four columns:
+
+- `customerID`
+- `Contract`
+- `MonthlyCharges`
+- `churn_probability`
+
+`demo_data.py` defines the records. They are designed for exact checks of
+segment counts, averages and empty results, not for realistic statistical
+inference. They are not a full replacement for the Text-to-SQL dataset.
+
+| Database | Purpose |
+| --- | --- |
+| `data/customers.duckdb` | Original scored dataset for Text-to-SQL |
+| `data/agent_demo.duckdb` | Synthetic comparison demo |
+
+Customer datasets, databases, generated exports and local evaluation results
+are excluded from Git. Existing demo databases are not automatically replaced
+when the source fixture changes.
 
 ## Requirements
 
 - Python 3.12
 - uv
-- Ollama
-- The `qwen2.5-coder:3b` model
-- A compatible customer dataset
+- Ollama with `qwen2.5-coder:3b` available
+- A compatible scored customer dataset for Text-to-SQL only
 
 The application expects Ollama at `http://localhost:11434`.
 
 ## Setup
 
-Run all project commands from the repository root.
+Run commands from the repository root.
 
 ### 1. Install dependencies
 
@@ -158,14 +192,13 @@ uv sync
 
 ### 2. Prepare the local model
 
-Install Ollama using the instructions at
-[ollama.com](https://ollama.com/), then download the model:
+Install Ollama using [the official instructions](https://ollama.com/), then:
 
 ```bash
 ollama pull qwen2.5-coder:3b
 ```
 
-If Ollama is not already running as a service, start it in a separate terminal:
+If Ollama is not already running as a service, use a separate terminal:
 
 ```bash
 ollama serve
@@ -174,30 +207,30 @@ ollama serve
 Check availability:
 
 ```bash
-curl -sS http://localhost:11434/api/tags
+curl --fail --show-error http://localhost:11434/api/tags
 ```
 
-### 3. Provide the dataset
+For the synthetic comparison demo, continue to
+[Bounded comparison demo](#bounded-comparison-demo). Steps 3–4 are for
+Text-to-SQL only.
 
-Place the upstream customer export at:
+### 3. Provide the scored dataset
+
+Place the upstream export at:
 
 ```text
 data/customer_segmentation.parquet
 ```
 
-The dataset is not bundled with this repository. It must contain the
-columns described in:
+It is not bundled with this repository. Required columns are described in:
 
 ```text
 src/customer_segmentation_assistant/prompts.py
 ```
 
-The upstream churn service is not required once the scored dataset has
-been exported.
+### 4. Create the Text-to-SQL database
 
-### 4. Create the database
-
-Run this once to import the Parquet dataset:
+Run once to import the Parquet dataset:
 
 ```bash
 uv run python - <<'PY'
@@ -210,7 +243,6 @@ database = Path("data/customers.duckdb")
 
 if not source.is_file():
     raise SystemExit(f"Missing dataset: {source}")
-
 if database.exists():
     raise SystemExit(f"Database already exists: {database}")
 
@@ -219,17 +251,13 @@ with duckdb.connect(str(database)) as connection:
         "CREATE TABLE customers AS SELECT * FROM read_parquet(?)",
         [str(source)],
     )
-    count = connection.execute(
-        "SELECT COUNT(*) FROM customers"
-    ).fetchone()[0]
+    count = connection.execute("SELECT COUNT(*) FROM customers").fetchone()[0]
 
 print(f"Created {database} with {count} customers.")
 PY
 ```
 
-## Web interface
-
-Start the application:
+## Text-to-SQL web interface
 
 ```bash
 uv run streamlit run streamlit_app.py \
@@ -237,7 +265,7 @@ uv run streamlit run streamlit_app.py \
   --server.port 8502
 ```
 
-Open **http://localhost:8502**.
+Open http://localhost:8502. Keep the terminal running.
 
 ### Example questions
 
@@ -259,180 +287,312 @@ How many customers have been with the company for at least 24 months and have a 
 
 ### Clarification workflow
 
-Ask:
-
-```text
-Show me high-risk customers.
-```
-
-When prompted for a threshold, answer:
+Ask `Show me high-risk customers.` and, when prompted, answer:
 
 ```text
 At least 65% churn probability. Show the top 5.
 ```
 
 The assistant combines the original request with the clarification answer.
-
 Up to three clarification answers are accepted for one request.
-After a completed query, the next question starts a new request.
-References to previous results, such as “show more of those,” are not
-currently supported.
+After a completed query, the next question starts a new request. References
+to previous results, such as “show more of those,” are not supported.
 
-Use **New conversation** to clear the displayed chat and pending
-clarification context. Chat history is held in browser-session state
-and is not persisted across sessions.
+Use **New conversation** to clear the chat and pending clarification context.
+History is kept in session state rather than durable storage.
 
 ### Inspect and download results
 
-Expand **View generated SQL** to inspect the query.
+Expand **View generated SQL** to inspect the query. Select
+**Download this result as CSV** to download the displayed result.
+The interface prepares CSV content in memory; it does not automatically
+write an export into the project directory.
 
-Click **Download this result as CSV** to download the displayed result.
-The web interface prepares CSV content in memory; it does not automatically
-write an export file into the project directory.
+## Bounded comparison demo
+
+This learning demo compares two or three supported contract types using one
+shared inclusive minimum predicted churn probability.
+
+### Start
+
+```bash
+uv run streamlit run streamlit_agent_demo.py \
+  --server.address 0.0.0.0 \
+  --server.port 8503 \
+  --server.headless true
+```
+
+Open http://localhost:8503. The demo creates `data/agent_demo.duckdb` when
+it does not exist. No upstream churn export is required.
+
+The address `0.0.0.0` allows connections through available network interfaces.
+For a loopback-only local session, use `--server.address 127.0.0.1` instead.
+
+### Example dialogue
+
+1. Enter: `Compare monthly and annual contracts.`
+2. Answer: `Use a minimum churn probability of 80%.`
+3. Inspect the recognized contracts and threshold.
+4. Select **Run this comparison**.
+5. Inspect model actions, aggregate tool results and the computed report.
+
+For the bundled synthetic data:
+
+| Contract | Matching customers | Average monthly charges | Average predicted churn probability |
+| --- | ---: | ---: | ---: |
+| Month-to-month | 1 | 60.00 | 80% |
+| One year | 1 | 70.00 | 85% |
+
+No currency is specified. Predicted probabilities are not observed churn events.
+
+### Execution flow
+
+```mermaid
+flowchart TD
+    A["User message"] --> B["Model extracts criteria"]
+    B --> C["Python validates and retains criteria"]
+    C --> D{"Criteria complete?"}
+    D -->|No| E["Ask for missing criteria"]
+    E --> A
+    D -->|Yes| F["User inspects filters and starts comparison"]
+    F --> G["Model selects an allowed action"]
+    G --> H{"Action"}
+    H -->|Tool call| I["Validate and query one segment"]
+    I --> J["Return aggregate result to model"]
+    J --> G
+    H -->|Finish| K["Verify coverage and render computed report"]
+```
+
+The model receives computed aggregate observations after each tool call.
+It does not receive individual customer rows in this loop.
+
+Python restricts the available action schema to the current state:
+
+- While segments remain, only a tool call for an outstanding contract is allowed.
+- When all segments have observations, only the completion signal is allowed.
+
+Independent execution checks reject duplicate queries, out-of-scope actions
+and premature completion. The UI permits at most four tool calls; the loop
+permits at most five planner calls with that configuration. Each model request
+uses a 180-second network timeout; this is not a total workflow deadline.
+
+The final report is rendered by Python from computed values. An earlier
+free-text experiment produced incorrect comparisons and invented currency;
+that experiment is not used to generate comparison reports.
+
+This is a deliberately constrained demonstration of an agent loop. For this
+fixed comparison, deterministic orchestration could execute the same queries
+without model-based action selection. Model-selected query order does not
+provide an analytical advantage for this task.
+
+### Conversation behavior
+
+Criteria persist within the comparison conversation. Values omitted from a
+follow-up retain previous values. A new message clears the previous report
+but does not automatically clear the criteria.
+
+When at least two contracts are known and the threshold is missing, a follow-up
+is treated as a threshold answer: the contract selection is preserved.
+Select **New comparison** to clear the conversation, filters, actions and report,
+or to change contract selection while answering that threshold question.
+
+New requests and follow-ups are not automatically distinguished. Results are
+queried only after **Run this comparison** is selected. The result, including
+tool observations, can be downloaded as JSON.
+
+### Scope and limitations
+
+- English requests for two or three explicitly named supported contract types.
+- Supported values: `Month-to-month`, `One year` and `Two year`.
+- One shared inclusive minimum predicted churn probability.
+- Additional filters, different per-segment thresholds and general analytical
+  requests are not supported.
+- Natural-language extraction can be incorrect or silently omit unsupported
+  criteria. Visible filters define what will actually be executed.
+- Clarification handling is specialized, not a general conversation engine.
+- Session state is not persisted durably.
+- No customer contact, campaign execution or data modification is available.
+- Synthetic results do not establish business impact or model accuracy.
 
 ## Command-line interface
 
-Count customers:
+The existing CLI operates on the Text-to-SQL dataset.
 
 ```bash
 uv run python -m customer_segmentation_assistant.cli \
   "How many customers are in the dataset?"
 ```
 
-Query a ranked segment:
-
 ```bash
 uv run python -m customer_segmentation_assistant.cli \
   "Show the 5 customers with the highest churn probability."
 ```
-
-Start a clarification workflow:
 
 ```bash
 uv run python -m customer_segmentation_assistant.cli \
   "Show me high-risk customers."
 ```
 
-Each CLI invocation starts a new conversation.
-
-For non-empty results, the CLI offers a CSV export:
-
-- Enter `y` to save the result under `data/exports/`.
-- Press Enter to skip the export.
-
-The CLI exporter refuses to overwrite an existing destination file.
+Each invocation starts a new conversation. For non-empty results, enter `y`
+to save CSV under `data/exports/`, or press Enter to skip. The exporter refuses
+to overwrite an existing destination.
 
 ## Validation and evaluation
 
 ### Automated checks
 
 ```bash
-uv run ruff check src tests streamlit_app.py scripts/evaluate_assistant.py
+uv run ruff check src tests scripts streamlit_app.py streamlit_agent_demo.py
 uv run pytest -q
 ```
 
-Tests cover areas including structured decision parsing, permitted database
-queries, rejected SQL operations, and CSV export behavior.
+The most recently reported development run passed **123 tests**. Coverage
+includes structured parsing, SQL restrictions, export behavior, tool arguments,
+clarification state, action restrictions, tool-call limits and computed reports.
+Unit tests do not establish natural-language accuracy.
 
-The browser workflow is also checked manually.
+Both browser workflows have also been exercised manually. The comparison demo
+was checked with clarification, visible filters, two tool calls, completion,
+report output and conversation reset.
 
-### Local-model evaluation
+### Text-to-SQL reference evaluation
 
 ```bash
 uv run python scripts/evaluate_assistant.py
 ```
 
-The latest reported evaluation run passed **9 of 9 reference cases**.
-
-The cases cover:
-
-- Customer counts
-- Combined filters and percentage thresholds
-- Missing values
-- Grouped aggregates
-- Ranked customer lists
-- Ambiguous risk categories
-- Query generation after a clarification answer
+The previously reported run passed **9 of 9 reference cases**, covering counts,
+combined filters, percentage thresholds, missing values, grouped aggregates,
+ranked lists and clarification follow-ups.
 
 Query evaluation compares returned values while ignoring output aliases.
-Row order is checked when required by the reference case.
+Row order is checked when required. Standalone clarification wording requires
+manual review. Unsupported responses were checked manually, not in these nine
+cases.
 
-For the standalone clarification case, the response type is checked
-automatically and the wording is reviewed manually.
+Several cases appear in the prompt or informed prompt changes. This is a small
+development suite, not an independent general-accuracy benchmark. The nine-case
+result has not been newly established by the comparison-demo tests.
 
-Unsupported responses have been checked manually through the interface;
-they are not included in the nine reference cases.
+### Single-segment tool-decision evaluation
 
-This is a small development evaluation suite. Several cases appear in the
-prompt or informed prompt changes, so the results are not an independent
-measure of general accuracy.
+```bash
+uv run python scripts/evaluate_tools.py
+```
+
+After separating criteria extraction from Python decision logic, the observed
+run passed **7 of 7 automatic checks**. Clarification wording was also reviewed
+manually. The cases informed development and are not an independent benchmark.
+They evaluate single-segment decisions, not complete comparison-agent behavior.
+
+Model responses and timings are saved under `data/evaluation/` and excluded
+from Git.
+
+### Comparison clarification check
+
+```bash
+uv run python scripts/check_comparison_dialogue.py
+```
+
+This live-model check verifies that a threshold follow-up preserves the
+previously selected contract types. It requires a running Ollama model.
+
+Broader end-to-end evaluation on previously unused questions remains open.
 
 ## Supported SQL scope
 
-The current policy permits a limited subset of SQL, including:
+The original Text-to-SQL policy permits:
 
-- A single SELECT statement against the unqualified `customers` table
+- A single SELECT against the unqualified `customers` table
 - Column selection and aliases
 - Comparisons and logical filters
-- NULL checks, IN, BETWEEN, and LIKE
-- COUNT, AVG, SUM, MIN, and MAX
-- GROUP BY, ORDER BY, DISTINCT, and LIMIT
+- NULL checks, IN, BETWEEN and LIKE
+- COUNT, AVG, SUM, MIN and MAX
+- GROUP BY, ORDER BY, DISTINCT and LIMIT
 
-Joins, subqueries, CTEs, unions, window functions, external data sources,
-and unsupported functions are rejected.
+Joins, subqueries, CTEs, unions, window functions, external sources and unsupported
+functions are rejected. The comparison tool instead uses fixed parameterized
+aggregate SQL; it does not execute SQL generated by the planner.
 
-## Limitations
+## Text-to-SQL limitations
 
 - One customer table and one scored dataset
-- No observed churn outcomes or event history
-- No historical score analysis
+- No observed churn outcomes, event history or historical score analysis
 - No external information retrieval
 - No predefined risk-category thresholds
 - No persistent conversation history
 - No follow-up modifications to completed queries
-- Local application; no publicly deployed service
+- Local prototype, not a publicly deployed service
 
-SQL validation and read-only access restrict supported operations.
-They do not guarantee that accepted SQL correctly represents the user's intent.
-Generated SQL is displayed for inspection.
+SQL validation and read-only access restrict operations but do not guarantee
+that a query represents the user's intent. Generated SQL is displayed for
+inspection.
 
-Local inference latency depends on hardware, model loading, prompt
-processing, and system load. The first request can be substantially slower.
+## Project-wide limitations
 
-The application is a portfolio prototype. Broader evaluation and additional
-operational controls would be needed before production use.
+Local latency depends on hardware, model loading, prompt processing and system
+load. Initial requests can be substantially slower. The project does not
+implement a general autonomous analyst, RAG, a multi-agent system or production
+access control.
+
+The interfaces are portfolio prototypes. Broader evaluation and operational
+controls would be needed before production use. The model-written explanation
+in `result_summary.py` remains an isolated experiment and is not used in the
+comparison report.
 
 ## Project structure
 
 ```text
 streamlit_app.py
+streamlit_agent_demo.py
 src/customer_segmentation_assistant/
+    agent.py
     cli.py
+    comparison_conversation.py
+    comparison_request.py
+    conversation.py
     database.py
     decisions.py
+    demo_data.py
     export.py
     llm.py
     prompts.py
+    result_summary.py
     sql_policy.py
+    tool_dispatch.py
+    tool_llm.py
+    tools.py
 evaluation/
     cases.json
+    tool_cases.json
 scripts/
+    check_comparison_dialogue.py
     evaluate_assistant.py
+    evaluate_tools.py
 tests/
 docs/images/
 ```
 
 | File | Purpose |
 | --- | --- |
-| `streamlit_app.py` | Browser-based chat interface |
-| `cli.py` | Terminal workflow |
-| `database.py` | Validated read-only database access |
-| `decisions.py` | Structured response parsing |
-| `export.py` | CLI CSV export |
-| `llm.py` | Local Ollama integration |
-| `prompts.py` | Table description and assistant instructions |
-| `sql_policy.py` | Supported SQL policy |
-| `evaluation/cases.json` | Reference questions and expected queries |
-| `scripts/evaluate_assistant.py` | Local-model evaluation |
-| `tests/` | Automated tests |
+| `streamlit_app.py` | Original Text-to-SQL browser interface |
+| `streamlit_agent_demo.py` | Comparison chat, visible filters, explicit execution and action trace |
+| `agent.py` | State-dependent action schemas, bounded execution and computed reporting |
+| `comparison_request.py` | Comparison-scope extraction and specialized threshold follow-up |
+| `comparison_conversation.py` | Comparison criteria retained across turns |
+| `conversation.py` | Single-segment clarification state |
+| `tools.py` | Validated read-only segment summary |
+| `tool_dispatch.py` | Allowlisted structured tool execution |
+| `tool_llm.py` | Single-segment extraction and Python decision logic |
+| `demo_data.py` | Synthetic customer fixture and database creation |
+| `result_summary.py` | Experimental model-written explanations, not used for comparison reports |
+| `database.py` | SQL-policy-validated read-only DuckDB access |
+| `decisions.py` | Original assistant decision parsing |
+| `llm.py` | Original Ollama integration and default model |
+| `prompts.py` | Text-to-SQL schema description and instructions |
+| `sql_policy.py` | Permitted SQL expressions and sources |
+| `cli.py` / `export.py` | Original terminal workflow and CSV export |
+| `evaluation/` | Development questions and expected results |
+| `scripts/` | Live-model evaluation and dialogue checks |
+| `tests/` | Automated tests independent of a running model |
 | `docs/images/` | Demonstration screenshots |
