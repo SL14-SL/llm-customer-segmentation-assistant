@@ -120,6 +120,11 @@ def main() -> None:
         arguments = decision["arguments"]
 
         st.subheader("Recognized filters")
+        st.caption(
+            "Criteria persist within this conversation. "
+            "Values omitted from a follow-up remain unchanged. "
+            "Select New comparison to start without previous filters."
+        )
         st.write("**Contracts:** " + ", ".join(arguments["contracts"]))
         st.write(
             "**Minimum predicted churn probability:** "
