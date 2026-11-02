@@ -4,7 +4,10 @@ import json
 from urllib.request import Request, urlopen
 
 from customer_segmentation_assistant.llm import DEFAULT_MODEL
-from customer_segmentation_assistant.tool_llm import parse_segment_criteria
+from customer_segmentation_assistant.tool_llm import (
+    extract_segment_criteria,
+    parse_segment_criteria,
+)
 from customer_segmentation_assistant.tools import CONTRACT_TYPES
 
 COMPARISON_SCHEMA = {
@@ -116,12 +119,12 @@ def parse_comparison_request(raw: str) -> dict[str, object]:
     }
 
 
-def generate_comparison_request(
+def extract_comparison_criteria(
     question: str,
     *,
     model: str = DEFAULT_MODEL,
 ) -> dict[str, object]:
-    """Propose a comparison scope without executing database queries."""
+    """Extract comparison criteria without executing database queries."""
     if not question.strip():
         raise ValueError("Question must not be empty.")
 
@@ -156,4 +159,39 @@ def generate_comparison_request(
     if not isinstance(raw, str) or not raw.strip():
         raise ValueError("Model returned no comparison criteria.")
 
-    return parse_comparison_request(raw)
+    # Validate before exposing the extracted criteria.
+    parse_comparison_request(raw)
+    return json.loads(raw)
+
+
+def generate_comparison_request(
+    question: str,
+    *,
+    model: str = DEFAULT_MODEL,
+) -> dict[str, object]:
+    """Extract comparison criteria and determine the next action."""
+    criteria = extract_comparison_criteria(question, model=model)
+    return parse_comparison_request(json.dumps(criteria))
+
+
+def extract_comparison_follow_up(
+    question: str,
+    *,
+    current_criteria: dict[str, object],
+    model: str = DEFAULT_MODEL,
+) -> dict[str, object]:
+    """Extract the missing threshold without changing known contracts."""
+    contracts = current_criteria["contracts"]
+    threshold = current_criteria["minimum_churn_probability"]
+
+    if len(contracts) >= 2 and threshold is None:
+        extracted = extract_segment_criteria(question, model=model)
+
+        return {
+            "contracts": [],
+            "minimum_churn_probability": (
+                extracted["minimum_churn_probability"]
+            ),
+        }
+
+    return extract_comparison_criteria(question, model=model)
