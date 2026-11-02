@@ -1,0 +1,56 @@
+[
+  {
+    "id": "monthly_80",
+    "question": "For monthly contracts, summarize customers whose predicted churn probability is 80% or higher.",
+    "expected_kind": "tool_call",
+    "expected_arguments": {
+      "contract": "Month-to-month",
+      "minimum_churn_probability": 0.8
+    }
+  },
+  {
+    "id": "two_year_40",
+    "question": "Give me a summary for two-year contracts with a minimum churn probability of 0.4.",
+    "expected_kind": "tool_call",
+    "expected_arguments": {
+      "contract": "Two year",
+      "minimum_churn_probability": 0.4
+    }
+  },
+  {
+    "id": "annual_72",
+    "question": "Use a 72 percent minimum predicted churn probability and annual contracts. Summarize the matching segment.",
+    "expected_kind": "tool_call",
+    "expected_arguments": {
+      "contract": "One year",
+      "minimum_churn_probability": 0.72
+    }
+  },
+  {
+    "id": "monthly_zero",
+    "question": "Summarize month-to-month customers with churn probability at least 0%.",
+    "expected_kind": "tool_call",
+    "expected_arguments": {
+      "contract": "Month-to-month",
+      "minimum_churn_probability": 0.0
+    }
+  },
+  {
+    "id": "missing_both",
+    "question": "Summarize customers with high predicted churn risk.",
+    "expected_kind": "clarification",
+    "manual_review": "Must ask for contract and a numerical risk threshold."
+  },
+  {
+    "id": "missing_threshold",
+    "question": "Give me a summary of customers on two-year contracts.",
+    "expected_kind": "clarification",
+    "manual_review": "Must ask only for the minimum probability; contract is already supplied."
+  },
+  {
+    "id": "missing_contract",
+    "question": "Summarize customers whose churn probability is at least 55%.",
+    "expected_kind": "clarification",
+    "manual_review": "Must ask only for contract; the 55% threshold is already supplied."
+  }
+]
