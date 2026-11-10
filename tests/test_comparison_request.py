@@ -85,3 +85,13 @@ def test_missing_criteria_produce_clarification(
 def test_rejects_invalid_scope(raw):
     with pytest.raises(ValueError):
         parse_comparison_request(raw)
+
+
+def test_unsupported_request_has_no_execution_arguments():
+    result = parse_comparison_request(json.dumps({
+        "kind": "unsupported",
+        "message": "Tenure filters are not supported.",
+    }))
+
+    assert result["kind"] == "unsupported"
+    assert "arguments" not in result

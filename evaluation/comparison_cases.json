@@ -96,5 +96,51 @@
     ],
     "expected_kind": "unsupported",
     "reason": "The comparison tool cannot apply tenure filters. It must not silently execute a broader comparison."
+  },
+  {
+  "id": "unsupported_filter_in_follow_up",
+  "messages": [
+    "Compare monthly and two-year contracts.",
+    "Use at least 45% predicted churn probability, but only customers with monthly charges below 50."
+  ],
+  "expected_kind": "unsupported",
+  "reason": "The follow-up adds a charge filter that the tool cannot apply."
+},
+{
+  "id": "unsupported_different_thresholds",
+  "messages": [
+    "Compare monthly customers with churn probability at least 40% against annual customers with churn probability at least 75%."
+  ],
+  "expected_kind": "unsupported",
+  "reason": "The tool supports only one shared threshold."
+},
+{
+  "id": "unsupported_observed_churn",
+  "messages": [
+    "Compare monthly and annual contracts with predicted churn probability at least 50%, showing how many customers actually cancelled."
+  ],
+  "expected_kind": "unsupported",
+  "reason": "Observed cancellation outcomes are unavailable."
+},
+{
+  "id": "same_threshold_repeated",
+  "messages": [
+    "Compare monthly customers with churn probability at least 60% against annual customers with churn probability at least 60%."
+  ],
+  "expected_kind": "comparison",
+  "expected_contracts": ["Month-to-month", "One year"],
+  "expected_threshold": 0.6,
+  "expected_metrics": {
+    "Month-to-month": {
+      "customer_count": 2,
+      "average_monthly_charges": 75.0,
+      "average_churn_probability": 0.75
+    },
+    "One year": {
+      "customer_count": 2,
+      "average_monthly_charges": 60.0,
+      "average_churn_probability": 0.75
+    }
   }
+}
 ]

@@ -96,6 +96,8 @@ def main() -> None:
 
             if decision["kind"] == "clarification":
                 reply = decision["question"]
+            elif decision["kind"] == "unsupported":
+                reply = decision["message"]
             else:
                 reply = (
                     "The comparison criteria are complete. "

@@ -118,6 +118,11 @@ def test_threshold_follow_up_ignores_spurious_contract(monkeypatch):
         "extract_segment_criteria",
         fake_extraction,
     )
+    monkeypatch.setattr(
+        comparison_request,
+        "check_comparison_scope",
+        lambda question, *, model: [],
+    )
 
     extracted = comparison_request.extract_comparison_follow_up(
         "Use a minimum churn probability of 70%.",
@@ -132,3 +137,56 @@ def test_threshold_follow_up_ignores_spurious_contract(monkeypatch):
             "minimum_churn_probability": 0.7,
         },
     }
+
+
+def test_unsupported_follow_up_blocks_conversation_until_reset():
+    conversation = ComparisonConversation()
+    conversation.update({
+        "contracts": ["Month-to-month", "One year"],
+        "minimum_churn_probability": None,
+    })
+
+    unsupported = {
+        "kind": "unsupported",
+        "message": "Tenure filters are not supported. Start a new comparison.",
+    }
+    assert conversation.update(unsupported) == unsupported
+
+    result = conversation.update({
+        "contracts": [],
+        "minimum_churn_probability": 0.7,
+    })
+
+    assert result == unsupported
+    assert conversation.criteria["minimum_churn_probability"] is None
+
+    fresh = ComparisonConversation()
+    assert fresh.unsupported_message is None
+
+
+def test_unsupported_follow_up_skips_criteria_extraction(monkeypatch):
+    monkeypatch.setattr(
+        comparison_request,
+        "check_comparison_scope",
+        lambda question, *, model: ["tenure of at least 24 months"],
+    )
+
+    def unexpected_extraction(*args, **kwargs):
+        raise AssertionError("Criteria extraction must not run.")
+
+    monkeypatch.setattr(
+        comparison_request,
+        "extract_segment_criteria",
+        unexpected_extraction,
+    )
+
+    result = comparison_request.extract_comparison_follow_up(
+        "Use 70%, but only customers with tenure of at least 24 months.",
+        current_criteria={
+            "contracts": ["Month-to-month", "One year"],
+            "minimum_churn_probability": None,
+        },
+    )
+
+    assert result["kind"] == "unsupported"
+    assert "arguments" not in result

@@ -3,6 +3,9 @@
 import json
 from urllib.request import Request, urlopen
 
+from customer_segmentation_assistant.comparison_scope import (
+    check_comparison_scope,
+)
 from customer_segmentation_assistant.llm import DEFAULT_MODEL
 from customer_segmentation_assistant.tool_llm import (
     extract_segment_criteria,
@@ -58,6 +61,27 @@ Do not execute tools, ask questions or calculate results.
 """
 
 
+def unsupported_scope(
+    question: str,
+    *,
+    model: str,
+) -> dict[str, object] | None:
+    """Represent unsupported requirements as a non-executable decision."""
+    requirements = check_comparison_scope(question, model=model)
+
+    if not requirements:
+        return None
+
+    return {
+        "kind": "unsupported",
+        "message": (
+            "This comparison cannot apply all requested requirements: "
+            + "; ".join(requirements)
+            + ". Select New comparison to start a supported request."
+        ),
+    }
+
+
 def parse_comparison_request(raw: str) -> dict[str, object]:
     """Validate extracted scope and request missing comparison criteria."""
     try:
@@ -69,7 +93,20 @@ def parse_comparison_request(raw: str) -> dict[str, object]:
         raise ValueError(  # noqa: TRY004
             "Comparison criteria must be a JSON object."
         )
+    if criteria.get("kind") == "unsupported":
+        message = criteria.get("message")
 
+        if (
+            set(criteria) != {"kind", "message"}
+            or not isinstance(message, str)
+            or not message.strip()
+        ):
+            raise ValueError("Invalid unsupported decision.")
+
+        return {
+            "kind": "unsupported",
+            "message": message.strip(),
+        }
     if set(criteria) != {"contracts", "minimum_churn_probability"}:
         raise ValueError("Unexpected or missing comparison fields.")
 
@@ -127,7 +164,9 @@ def extract_comparison_criteria(
     """Extract comparison criteria without executing database queries."""
     if not question.strip():
         raise ValueError("Question must not be empty.")
-
+    unsupported = unsupported_scope(question, model=model)
+    if unsupported is not None:
+        return unsupported
     payload = {
         "model": model,
         "system": COMPARISON_PROMPT,
@@ -180,11 +219,15 @@ def extract_comparison_follow_up(
     current_criteria: dict[str, object],
     model: str = DEFAULT_MODEL,
 ) -> dict[str, object]:
-    """Extract the missing threshold without changing known contracts."""
+    """Check follow-up scope and preserve contracts during threshold replies."""
     contracts = current_criteria["contracts"]
     threshold = current_criteria["minimum_churn_probability"]
 
     if len(contracts) >= 2 and threshold is None:
+        unsupported = unsupported_scope(question, model=model)
+        if unsupported is not None:
+            return unsupported
+
         extracted = extract_segment_criteria(question, model=model)
 
         return {
