@@ -1,6 +1,7 @@
 """Generate validated assistant decisions using local Ollama."""
 
 import json
+import os
 from urllib.request import Request, urlopen
 
 from customer_segmentation_assistant.decisions import (
@@ -11,7 +12,7 @@ from customer_segmentation_assistant.decisions import (
 )
 from customer_segmentation_assistant.prompts import SYSTEM_PROMPT
 
-DEFAULT_MODEL = "qwen2.5-coder:3b"
+DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
 DECISION_SCHEMA = {
     "anyOf": [

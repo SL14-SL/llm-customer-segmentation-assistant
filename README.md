@@ -132,6 +132,17 @@ uses the project default.
 
 ### Text-to-SQL dataset
 
+Two data sources are available for the Text-to-SQL interface:
+
+- **Synthetic demo:** generate 120 reproducible customers using
+  `uv run python scripts/create_text_to_sql_demo.py`.
+  This creates `data/text_to_sql_demo.duckdb` with all required columns.
+  Scores, actions and estimated values are artificial demonstration inputs.
+  Start the application with
+  `CUSTOMER_DATABASE=data/text_to_sql_demo.duckdb` as shown in the quick start.
+- **Upstream scored export:** use the customer dataset described below.
+  This requires a separate export and database import.
+
 The recorded development dataset contains **6,734 customer records** exported
 from a separate churn prediction project. Customer attributes are combined with:
 
@@ -176,9 +187,48 @@ when the source fixture changes.
 - Python 3.12
 - uv
 - Ollama with `qwen2.5-coder:3b` available
-- A compatible scored customer dataset for Text-to-SQL only
+- For Text-to-SQL: either the generated synthetic demo dataset
+  (see Quick start with synthetic data) or a compatible upstream scored
+  customer export
 
 The application expects Ollama at `http://localhost:11434`.
+
+## Quick start with synthetic data
+
+Try the complete Text-to-SQL interface without an upstream churn export.
+Requires Python 3.12, uv and a running Ollama installation.
+
+```bash
+uv sync
+ollama pull qwen2.5-coder:3b
+uv run python scripts/create_text_to_sql_demo.py
+
+CUSTOMER_DATABASE=data/text_to_sql_demo.duckdb \
+uv run streamlit run streamlit_app.py \
+  --server.address 127.0.0.1 \
+  --server.port 8502
+```
+
+Open http://localhost:8502.
+
+The generator creates 120 reproducible synthetic customers with all columns
+required by the Text-to-SQL application. Scores, recommended actions and
+estimated values are artificial demonstration inputs, not model predictions
+or evidence of business impact. No currency is specified.
+
+Example questions:
+
+- How many customers are in the dataset?
+- What is the average churn probability for each contract type?
+- How many customers have missing total charges?
+
+The first question returns 120 customers; the missing-values question returns 10.
+
+The generator refuses to overwrite an existing destination.
+`CUSTOMER_DATABASE` selects the database for both the web interface and CLI.
+Without it, the application uses `data/customers.duckdb`.
+
+The six-customer bounded comparison demo uses a separate database and fixture.
 
 ## Setup
 
@@ -446,7 +496,7 @@ uv run ruff check src tests scripts streamlit_app.py streamlit_agent_demo.py
 uv run pytest -q
 ```
 
-The most recently reported development run passed **123 tests**. Coverage
+The most recently reported development run passed **131 tests**. Coverage
 includes structured parsing, SQL restrictions, export behavior, tool arguments,
 clarification state, action restrictions, tool-call limits and computed reports.
 Unit tests do not establish natural-language accuracy.
@@ -497,7 +547,23 @@ uv run python scripts/check_comparison_dialogue.py
 This live-model check verifies that a threshold follow-up preserves the
 previously selected contract types. It requires a running Ollama model.
 
-Broader end-to-end evaluation on previously unused questions remains open.
+### Comparison end-to-end evaluation
+
+```bash
+OLLAMA_MODEL=qwen2.5:14b uv run python scripts/evaluate_comparison.py
+```
+
+The development run on 2026-11-11 passed **8 of 8 cases**, covering
+two- and three-contract comparisons, empty segments, threshold clarification,
+and rejection of unsupported tenure filters, monthly-charge filters,
+different per-segment thresholds and additional filters in follow-ups.
+
+These cases informed development and are not an independent benchmark.
+Results apply to the tested model and cases; they do not establish general
+natural-language accuracy.
+
+Full dialogues, actions and results are saved under `data/evaluation/`
+and excluded from Git.
 
 ## Supported SQL scope
 
@@ -564,10 +630,13 @@ src/customer_segmentation_assistant/
     tools.py
 evaluation/
     cases.json
+    comparison_cases.json
     tool_cases.json
 scripts/
     check_comparison_dialogue.py
+    create_text_to_sql_demo.py
     evaluate_assistant.py
+    evaluate_comparison.py
     evaluate_tools.py
 tests/
 docs/images/
