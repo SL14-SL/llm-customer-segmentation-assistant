@@ -109,23 +109,24 @@ def test_threshold_follow_up_ignores_spurious_contract(monkeypatch):
 
     def fake_extraction(question, *, model):
         return {
-            "contract": "One year",
+            "contracts": ["Two year"],
             "minimum_churn_probability": 0.7,
         }
 
     monkeypatch.setattr(
         comparison_request,
-        "extract_segment_criteria",
+        "extract_comparison_criteria",
         fake_extraction,
     )
 
     extracted = comparison_request.extract_comparison_follow_up(
-        "Use a minimum churn probability of 70%.",
+        "At least 70%.",
         current_criteria=conversation.criteria,
+        model="test-model",
     )
-    result = conversation.update(extracted)
+    decision = conversation.update(extracted)
 
-    assert result == {
+    assert decision == {
         "kind": "comparison",
         "arguments": {
             "contracts": ["Month-to-month", "One year"],

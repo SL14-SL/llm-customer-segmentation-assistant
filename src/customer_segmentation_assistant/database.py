@@ -1,5 +1,6 @@
 """Read customer segments from the local DuckDB database."""
 
+import os
 from pathlib import Path
 
 import duckdb
@@ -7,7 +8,9 @@ import pandas as pd
 
 from customer_segmentation_assistant.sql_policy import validate_sql
 
-DEFAULT_DATABASE = Path("data/customers.duckdb")
+DEFAULT_DATABASE = Path(
+    os.environ.get("CUSTOMER_DATABASE", "data/customers.duckdb")
+)
 
 
 def query_dataframe(

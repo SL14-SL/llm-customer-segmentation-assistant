@@ -5,7 +5,10 @@
       "Compare month-to-month and two-year customers with predicted churn probability of at least 10%."
     ],
     "expected_kind": "comparison",
-    "expected_contracts": ["Month-to-month", "Two year"],
+    "expected_contracts": [
+      "Month-to-month",
+      "Two year"
+    ],
     "expected_threshold": 0.1,
     "expected_metrics": {
       "Month-to-month": {
@@ -26,7 +29,11 @@
       "Compare Month-to-month, One year and Two year contracts using a minimum predicted churn probability of 20%."
     ],
     "expected_kind": "comparison",
-    "expected_contracts": ["Month-to-month", "One year", "Two year"],
+    "expected_contracts": [
+      "Month-to-month",
+      "One year",
+      "Two year"
+    ],
     "expected_threshold": 0.2,
     "expected_metrics": {
       "Month-to-month": {
@@ -52,7 +59,10 @@
       "Compare one-year and two-year contracts. Include only customers with a predicted churn probability of at least 95%."
     ],
     "expected_kind": "comparison",
-    "expected_contracts": ["One year", "Two year"],
+    "expected_contracts": [
+      "One year",
+      "Two year"
+    ],
     "expected_threshold": 0.95,
     "expected_metrics": {
       "One year": {
@@ -74,7 +84,10 @@
       "The minimum predicted churn probability should be 81%."
     ],
     "expected_kind": "comparison",
-    "expected_contracts": ["One year", "Two year"],
+    "expected_contracts": [
+      "One year",
+      "Two year"
+    ],
     "expected_threshold": 0.81,
     "expected_metrics": {
       "One year": {
@@ -96,5 +109,27 @@
     ],
     "expected_kind": "unsupported",
     "reason": "The comparison tool cannot apply tenure filters. It must not silently execute a broader comparison."
+  },
+  {
+    "id": "unsupported_monthly_charge_filter",
+    "messages": [
+      "Compare monthly and annual contracts with predicted churn probability at least 60%, but only customers whose monthly charges exceed 80."
+    ],
+    "expected_kind": "unsupported"
+  },
+  {
+    "id": "unsupported_different_thresholds",
+    "messages": [
+      "Compare monthly customers with predicted churn probability at least 40% against annual customers with predicted churn probability at least 75%."
+    ],
+    "expected_kind": "unsupported"
+  },
+  {
+    "id": "unsupported_filter_in_follow_up",
+    "messages": [
+      "Compare annual and two-year customer contracts.",
+      "Use a minimum predicted churn probability of 81%, but only include customers with tenure of at least 24 months."
+    ],
+    "expected_kind": "unsupported"
   }
 ]

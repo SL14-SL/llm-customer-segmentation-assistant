@@ -18,12 +18,23 @@ class ComparisonConversation:
             "minimum_churn_probability": None,
         }
     )
+    unsupported_message: str | None = None
 
     def update(self, extracted: dict[str, object]) -> dict[str, object]:
-        """Validate an update and retain criteria absent from that turn."""
-        # JSON round-trip also detaches mutable lists from the caller.
+        """Validate updates and retain unsupported requirements."""
+        if self.unsupported_message is not None:
+            return {
+                "kind": "unsupported",
+                "message": self.unsupported_message,
+            }
+
         supplied = json.loads(json.dumps(extracted))
-        parse_comparison_request(json.dumps(supplied))
+        supplied_decision = parse_comparison_request(json.dumps(supplied))
+
+        if supplied_decision["kind"] == "unsupported":
+            self.unsupported_message = supplied_decision["message"]
+            return supplied_decision
+
         merged = json.loads(json.dumps(self.criteria))
 
         if supplied["contracts"]:
