@@ -10,6 +10,53 @@ DuckDB and Streamlit:
 
 Both interfaces run locally. No external LLM API account is required.
 
+## Quick start: self-contained Text-to-SQL demo
+
+Install Docker Desktop (or Docker Engine with Compose), then run from this folder:
+
+```bash
+docker compose up --build -d
+```
+
+Open http://localhost:8502 once startup completes. First startup downloads the
+Python dependencies and the Ollama model; allow time for this download.
+The app waits for the model download before starting. No Python installation,
+Ollama installation, API key or upstream churn project is needed on the host.
+This configuration uses CPU inference; response times depend on your hardware.
+
+```bash
+docker compose logs -f model-init app
+docker compose ps
+```
+
+Try “How many customers are in the dataset?” (expected: **300**) or
+“What is the average churn probability for each contract type?”.
+
+The dedicated demo database contains 300 reproducible fictional customers
+(seed 42), all columns in the Text-to-SQL schema, three contract types and
+missing values. Scores, actions and values are illustrative synthetic inputs,
+not trained-model outputs. The UI labels this demo explicitly. The original
+six-customer comparison fixture and upstream database are separate.
+
+Stop with `docker compose down`. Model and demo data persist in named volumes.
+To change the model, set `OLLAMA_MODEL` in your shell or in a local `.env` file,
+then run the start command again. Models run inside Compose; an existing host
+Ollama installation is not used. Only the web UI is published, on loopback.
+
+### Run the same demo without Docker
+
+Complete dependency and Ollama setup below, then:
+
+```bash
+uv run python -m customer_segmentation_assistant.text_sql_demo
+CUSTOMER_DATABASE=data/text_sql_demo.duckdb SYNTHETIC_DEMO=1 uv run streamlit run streamlit_app.py --server.address 127.0.0.1 --server.port 8502
+```
+
+The generator reuses an existing database without overwriting it. To regenerate,
+stop the local app and remove only `data/text_sql_demo.duckdb` before rerunning.
+`OLLAMA_BASE_URL` defaults to `http://localhost:11434` for the Text-to-SQL app;
+set it to use a different Ollama server.
+
 ## Choose an interface
 
 | Interface | Entry point | Data | Model responsibility |
