@@ -1,5 +1,6 @@
 """Local chat interface for customer segmentation."""
 
+import os
 from datetime import UTC, datetime
 from time import perf_counter
 from urllib.error import URLError
@@ -94,7 +95,20 @@ def process_question(question: str) -> dict:
         "Generate SQL if the missing information has been supplied."
     )
 
-    decision = generate_decision(current_request)
+    customer_messages = [
+        entry.removeprefix("Original customer question: ").removeprefix(
+            "Customer answer: "
+        )
+        for entry in context
+        if entry.startswith(
+            ("Original customer question: ", "Customer answer: ")
+        )
+    ]
+
+    decision = generate_decision(
+        current_request,
+        customer_messages=customer_messages,
+    )
 
     if isinstance(decision, UnsupportedDecision):
         st.session_state.pending_context = []
@@ -192,6 +206,12 @@ st.caption(
     "Ask a question, clarify your criteria, and explore the results. "
     "Powered by a local language model."
 )
+
+if os.getenv("SYNTHETIC_DEMO") == "1":
+    st.info(
+        "Synthetic demo: 300 fictional customers. Scores, actions and values "
+        "are generated examples, not predictions from a trained model."
+    )
 
 if not DEFAULT_DATABASE.is_file():
     st.error(

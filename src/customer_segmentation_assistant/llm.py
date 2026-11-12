@@ -11,6 +11,9 @@ from customer_segmentation_assistant.decisions import (
     parse_decision,
 )
 from customer_segmentation_assistant.prompts import SYSTEM_PROMPT
+from customer_segmentation_assistant.row_limits import enforce_row_limit
+
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
 
 DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
@@ -57,6 +60,7 @@ def generate_decision(
     question: str,
     *,
     model: str = DEFAULT_MODEL,
+    customer_messages: list[str] | None = None,
 ) -> QueryDecision | ClarificationDecision | UnsupportedDecision:
     """Generate one decision without executing SQL."""
     if not question.strip():
@@ -77,7 +81,7 @@ def generate_decision(
     }
 
     request = Request(
-        "http://localhost:11434/api/generate",
+        f"{OLLAMA_BASE_URL}/api/generate",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -89,4 +93,12 @@ def generate_decision(
     if not result.get("done") or result.get("done_reason") != "stop":
         raise ValueError("Local model did not complete its response normally.")
 
-    return parse_decision(result["response"])
+    decision = parse_decision(result["response"])
+
+    if isinstance(decision, QueryDecision):
+        return enforce_row_limit(
+            decision,
+            customer_messages if customer_messages is not None else [question],
+        )
+
+    return decision

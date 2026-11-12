@@ -56,9 +56,20 @@ def main() -> None:
             "Generate SQL if the missing information has been supplied."
         )
 
+        customer_messages = [
+            entry.removeprefix("Original customer question: ").removeprefix(
+                "Customer answer: "
+            )
+            for entry in context
+            if entry.startswith(
+                ("Original customer question: ", "Customer answer: ")
+            )
+        ]
+
         decision = generate_decision(
             current_request,
             model=args.model,
+            customer_messages=customer_messages,
         )
 
         if isinstance(decision, UnsupportedDecision):

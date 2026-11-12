@@ -43,3 +43,36 @@ jobs:
 
       - name: Run unit tests
         run: uv run --no-sync pytest -q
+  container:
+    name: Container demo smoke test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build application
+        run: docker build -t customer-sql-demo .
+      - name: Start synthetic demo without model inference
+        run: |
+          docker run -d --name sql-demo -p 127.0.0.1:8502:8502 \
+            -e CUSTOMER_DATABASE=/app/data/text_sql_demo.duckdb \
+            -e SYNTHETIC_DEMO=1 customer-sql-demo sh -c \
+            'python -m customer_segmentation_assistant.text_sql_demo && exec streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=8502 --server.headless=true'
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://localhost:8502/_stcore/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          docker logs sql-demo
+          exit 1
+      - name: Verify demo data in container
+        run: >-
+          docker exec sql-demo python -c
+          "from customer_segmentation_assistant.database import query_dataframe;
+          assert query_dataframe('SELECT COUNT(*) FROM customers').iloc[0, 0] == 300"
+      - name: Container logs
+        if: always()
+        run: docker logs sql-demo || true
