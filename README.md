@@ -78,6 +78,11 @@ serve as evidence for the newer comparison demo.
 
 ## Text-to-SQL demo
 
+The screenshots below show the original scored development dataset.
+The Docker quick start uses a separate dataset of 300 synthetic customers,
+so customer IDs, counts and values differ from the screenshots.
+Both datasets use the same Text-to-SQL interface.
+
 ### Find customer segments
 
 Ask for a customer segment using contract types, churn probabilities,
@@ -153,9 +158,30 @@ Customer records are queried locally and are not included in the model prompt.
 - Requests such as “top 5” apply the requested limit.
 - Requests for “all” matching customers omit the limit.
 
-These are model instructions. SQL validation checks permitted operations;
-it does not independently verify that every requested criterion was interpreted
-correctly. Inspect the displayed SQL.
+### Result-limit enforcement
+
+After SQL generation, Python removes the model-generated LIMIT and applies
+the count recognized from the customer's messages.
+
+Supported English count phrases use positive integers, for example:
+
+- `top 5`, `bottom 5`, `first 5` or `last 5`
+- `show 5 customers` or `return 5 rows`
+- `limit to 5`
+- `all matching customers` or `no limit`
+
+A count supplied before a clarification is retained unless a later customer
+message supplies a different count or explicitly requests all matching results.
+Assistant clarification messages are excluded from count extraction.
+
+If no supported count phrase is recognized, no LIMIT is applied.
+Conflicting counts within one message trigger a clarification.
+Spelled-out numbers such as `five` and other count formulations are not
+recognized by this rule.
+
+This check controls the result count only. Filter interpretation, selected
+columns and ranking direction still depend on generated SQL. Inspect the SQL
+to confirm that it represents your request.
 
 ## Technology
 
