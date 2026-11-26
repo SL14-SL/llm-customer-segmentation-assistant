@@ -3,7 +3,7 @@
 import json
 from urllib.request import Request, urlopen
 
-from customer_segmentation_assistant.llm import DEFAULT_MODEL
+from customer_segmentation_assistant.llm import DEFAULT_MODEL, OLLAMA_BASE_URL
 
 SUMMARY_SYSTEM_PROMPT = """
 Explain the supplied customer-segment tool result in concise English.
@@ -72,7 +72,7 @@ def explain_segment_result(
     }
 
     request = Request(
-        "http://localhost:11434/api/generate",
+        f"{OLLAMA_BASE_URL}/api/generate",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",

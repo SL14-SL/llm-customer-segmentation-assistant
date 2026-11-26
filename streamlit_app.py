@@ -17,6 +17,7 @@ from customer_segmentation_assistant.decisions import (
     UnsupportedDecision,
 )
 from customer_segmentation_assistant.llm import DEFAULT_MODEL, generate_decision
+from customer_segmentation_assistant.ui_theme import apply_ui_theme
 
 MAX_CLARIFICATIONS = 3
 
@@ -25,6 +26,8 @@ st.set_page_config(
     page_icon="💬",
     layout="wide",
 )
+
+apply_ui_theme()
 
 st.session_state.setdefault("messages", [])
 st.session_state.setdefault("pending_context", [])
@@ -50,7 +53,7 @@ def render_message(message: dict, index: int) -> None:
                     language="sql",
                     wrap_lines=True,
                 )
-                
+
         if "result" in message:
             result = message["result"]
 
@@ -100,9 +103,7 @@ def process_question(question: str) -> dict:
             "Customer answer: "
         )
         for entry in context
-        if entry.startswith(
-            ("Original customer question: ", "Customer answer: ")
-        )
+        if entry.startswith(("Original customer question: ", "Customer answer: "))
     ]
 
     decision = generate_decision(
@@ -237,15 +238,18 @@ placeholder = (
     else "Ask a question about your customers..."
 )
 
-question = st.chat_input(placeholder, max_chars=4000)
+with st.container():
+    question = st.chat_input(placeholder, max_chars=4000)
 
 if question and question.strip():
     question = question.strip()
 
-    st.session_state.messages.append({
-        "role": "user",
-        "content": question,
-    })
+    st.session_state.messages.append(
+        {
+            "role": "user",
+            "content": question,
+        }
+    )
 
     try:
         with st.spinner("Preparing your answer with the local model..."):

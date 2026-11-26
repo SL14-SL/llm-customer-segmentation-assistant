@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from customer_segmentation_assistant.llm import DEFAULT_MODEL
+from customer_segmentation_assistant.llm import DEFAULT_MODEL, OLLAMA_BASE_URL
 from customer_segmentation_assistant.tool_dispatch import execute_tool_call
 from customer_segmentation_assistant.tools import CONTRACT_TYPES
 
@@ -77,7 +77,7 @@ def propose_next_action(
         },
     }
     request = Request(
-        "http://localhost:11434/api/generate",
+        f"{OLLAMA_BASE_URL}/api/generate",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
@@ -134,9 +134,7 @@ def render_comparison(observations: list[dict[str, object]]) -> str:
                 f"{result['average_churn_probability']:.1%}."
             )
 
-    lines.append(
-        "\nThese statistics describe only the matching customer segments."
-    )
+    lines.append("\nThese statistics describe only the matching customer segments.")
     return "\n".join(lines)
 
 
@@ -146,9 +144,7 @@ def run_comparison(
     minimum_churn_probability: float,
     database: Path,
     max_tool_calls: int = 4,
-    planner: Callable[[dict[str, object]], dict[str, object]] = (
-        propose_next_action
-    ),
+    planner: Callable[[dict[str, object]], dict[str, object]] = (propose_next_action),
 ) -> dict[str, object]:
     """Execute permitted actions until completion or a limit violation."""
     if (
@@ -185,9 +181,7 @@ def run_comparison(
         context = {
             "contracts": list(contracts),
             "remaining_contracts": [
-                contract
-                for contract in contracts
-                if contract not in completed
+                contract for contract in contracts if contract not in completed
             ],
             "minimum_churn_probability": threshold,
             "observations": observations,
@@ -214,10 +208,7 @@ def run_comparison(
                 "tool_calls": len(observations),
             }
 
-        if (
-            action.get("kind") != "tool_call"
-            or set(action) != {"kind", "contract"}
-        ):
+        if action.get("kind") != "tool_call" or set(action) != {"kind", "contract"}:
             raise ValueError("Unsupported agent action.")
 
         contract = action["contract"]
@@ -242,10 +233,12 @@ def run_comparison(
             json.dumps(call),
             database=database,
         )
-        observations.append({
-            "call": call,
-            "result": result,
-        })
+        observations.append(
+            {
+                "call": call,
+                "result": result,
+            }
+        )
         completed.add(contract)
 
     raise RuntimeError("Agent step limit reached.")

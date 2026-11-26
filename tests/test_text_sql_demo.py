@@ -50,3 +50,18 @@ def test_demo_is_reproducible_and_preserves_existing_files(tmp_path):
     with pytest.raises(FileExistsError):
         create_text_sql_demo(first)
     assert first.read_bytes() == original
+
+
+def test_failed_demo_creation_does_not_publish_database(tmp_path, monkeypatch):
+    database = tmp_path / "demo.duckdb"
+
+    def fail_connect(*args, **kwargs):
+        raise RuntimeError("Simulated database creation failure")
+
+    monkeypatch.setattr(duckdb, "connect", fail_connect)
+
+    with pytest.raises(RuntimeError, match="Simulated database creation failure"):
+        create_text_sql_demo(database)
+
+    assert not database.exists()
+    assert list(tmp_path.iterdir()) == []
