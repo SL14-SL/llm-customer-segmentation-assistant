@@ -49,6 +49,33 @@ services:
       retries: 12
     restart: unless-stopped
 
+  comparison:
+    build: .
+    ports:
+      - "127.0.0.1:8503:8503"
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:3b}
+    volumes:
+      - comparison_data:/app/data
+    command:
+      - streamlit
+      - run
+      - streamlit_agent_demo.py
+      - --server.address=0.0.0.0
+      - --server.port=8503
+      - --server.headless=true
+    depends_on:
+      model-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "from urllib.request import urlopen; urlopen('http://localhost:8503/_stcore/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+    restart: unless-stopped
+
 volumes:
   ollama_models:
   demo_data:
+  comparison_data:

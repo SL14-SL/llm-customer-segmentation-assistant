@@ -3,6 +3,7 @@
 import argparse
 import random
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 import duckdb
 import pandas as pd
@@ -70,9 +71,16 @@ def create_text_sql_demo(path: Path) -> None:
         rows.append(row)
     frame = pd.DataFrame(rows)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with duckdb.connect(str(path)) as connection:
-        connection.register("demo_rows", frame)
-        connection.execute("CREATE TABLE customers AS SELECT * FROM demo_rows")
+
+    with TemporaryDirectory(dir=path.parent) as temporary:
+        temporary_database = Path(temporary) / "customers.duckdb"
+
+        with duckdb.connect(str(temporary_database)) as connection:
+            connection.register("demo_rows", frame)
+            connection.execute("CREATE TABLE customers AS SELECT * FROM demo_rows")
+
+        # Publish the completed database without overwriting an existing file.
+        path.hardlink_to(temporary_database)
 
 
 def main() -> None:

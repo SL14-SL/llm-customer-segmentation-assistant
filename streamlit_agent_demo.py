@@ -16,6 +16,7 @@ from customer_segmentation_assistant.comparison_request import (
     extract_comparison_follow_up,
 )
 from customer_segmentation_assistant.demo_data import create_demo_database
+from customer_segmentation_assistant.ui_theme import apply_ui_theme
 
 DATABASE = Path("data/agent_demo.duckdb")
 
@@ -36,6 +37,8 @@ def main() -> None:
         page_icon="🔎",
         layout="wide",
     )
+
+    apply_ui_theme()
 
     if "comparison" not in st.session_state:
         reset_conversation()
@@ -70,50 +73,6 @@ def main() -> None:
         with st.chat_message(message["role"]):
             st.write(message["content"])
 
-    message = st.chat_input("Describe a contract comparison in English")
-
-    if message:
-        st.session_state["result"] = None
-        st.session_state["actions"] = []
-        st.session_state["decision"] = None
-
-        st.session_state["messages"].append({
-            "role": "user",
-            "content": message,
-        })
-
-        conversation = st.session_state["comparison"]
-
-        try:
-            with st.spinner("Extracting comparison criteria…"):
-                extracted = extract_comparison_follow_up(
-                    message,
-                    current_criteria=conversation.criteria,
-                )
-                decision = conversation.update(extracted)
-
-            st.session_state["decision"] = decision
-
-            if decision["kind"] == "clarification":
-                reply = decision["question"]
-            else:
-                reply = (
-                    "The comparison criteria are complete. "
-                    "Check the filters below before running it."
-                )
-
-        except Exception as error:  # noqa: BLE001 - display request errors in UI
-            reply = (
-                f"Could not interpret this request: {type(error).__name__}. "
-                "Try rephrasing it or start a new comparison."
-            )
-
-        st.session_state["messages"].append({
-            "role": "assistant",
-            "content": reply,
-        })
-        st.rerun()
-
     decision = st.session_state["decision"]
 
     if decision is not None and decision["kind"] == "comparison":
@@ -142,10 +101,12 @@ def main() -> None:
 
             def visible_planner(context):
                 action = propose_next_action(context)
-                actions.append({
-                    "completed_tool_calls": len(context["observations"]),
-                    "action": action,
-                })
+                actions.append(
+                    {
+                        "completed_tool_calls": len(context["observations"]),
+                        "action": action,
+                    }
+                )
                 return action
 
             try:
@@ -166,10 +127,7 @@ def main() -> None:
                 st.session_state["result"] = result
 
             except Exception as error:  # noqa: BLE001 - display execution errors in UI
-                st.error(
-                    "Comparison stopped: "
-                    f"{type(error).__name__}: {error}"
-                )
+                st.error(f"Comparison stopped: {type(error).__name__}: {error}")
             finally:
                 st.session_state["actions"] = actions
 
@@ -201,6 +159,55 @@ def main() -> None:
             file_name="segment-comparison.json",
             mime="application/json",
         )
+
+    with st.container():
+        message = st.chat_input("Describe a contract comparison in English")
+
+    if message:
+        st.session_state["result"] = None
+        st.session_state["actions"] = []
+        st.session_state["decision"] = None
+
+        st.session_state["messages"].append(
+            {
+                "role": "user",
+                "content": message,
+            }
+        )
+
+        conversation = st.session_state["comparison"]
+
+        try:
+            with st.spinner("Extracting comparison criteria…"):
+                extracted = extract_comparison_follow_up(
+                    message,
+                    current_criteria=conversation.criteria,
+                )
+                decision = conversation.update(extracted)
+
+            st.session_state["decision"] = decision
+
+            if decision["kind"] == "clarification":
+                reply = decision["question"]
+            else:
+                reply = (
+                    "The comparison criteria are complete. "
+                    "Check the filters below before running it."
+                )
+
+        except Exception as error:  # noqa: BLE001 - display request errors in UI
+            reply = (
+                f"Could not interpret this request: {type(error).__name__}. "
+                "Try rephrasing it or start a new comparison."
+            )
+
+        st.session_state["messages"].append(
+            {
+                "role": "assistant",
+                "content": reply,
+            }
+        )
+        st.rerun()
 
 
 if __name__ == "__main__":

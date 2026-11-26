@@ -3,7 +3,7 @@
 import json
 from urllib.request import Request, urlopen
 
-from customer_segmentation_assistant.llm import DEFAULT_MODEL
+from customer_segmentation_assistant.llm import DEFAULT_MODEL, OLLAMA_BASE_URL
 from customer_segmentation_assistant.tool_llm import parse_segment_criteria
 from customer_segmentation_assistant.tools import CONTRACT_TYPES
 
@@ -322,7 +322,7 @@ def extract_comparison_criteria(
         },
     }
     request = Request(
-        "http://localhost:11434/api/generate",
+        f"{OLLAMA_BASE_URL}/api/generate",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json"},
         method="POST",
