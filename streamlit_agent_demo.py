@@ -189,11 +189,15 @@ def main() -> None:
 
             if decision["kind"] == "clarification":
                 reply = decision["question"]
-            else:
+            elif decision["kind"] == "unsupported":
+                reply = decision["message"]
+            elif decision["kind"] == "comparison":
                 reply = (
                     "The comparison criteria are complete. "
                     "Check the filters below before running it."
                 )
+            else:
+                raise ValueError("Unknown comparison decision.")
 
         except Exception as error:  # noqa: BLE001 - display request errors in UI
             reply = (
