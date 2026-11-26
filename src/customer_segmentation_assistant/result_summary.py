@@ -3,7 +3,10 @@
 import json
 from urllib.request import Request, urlopen
 
-from customer_segmentation_assistant.llm import DEFAULT_MODEL, OLLAMA_BASE_URL
+from customer_segmentation_assistant.config import (
+    DEFAULT_MODEL,
+    OLLAMA_BASE_URL,
+)
 
 SUMMARY_SYSTEM_PROMPT = """
 Explain the supplied customer-segment tool result in concise English.

@@ -6,7 +6,10 @@ from urllib.request import Request, urlopen
 from customer_segmentation_assistant.comparison_scope import (
     check_comparison_scope,
 )
-from customer_segmentation_assistant.llm import DEFAULT_MODEL, OLLAMA_BASE_URL
+from customer_segmentation_assistant.config import (
+    DEFAULT_MODEL,
+    OLLAMA_BASE_URL,
+)
 from customer_segmentation_assistant.tool_llm import parse_segment_criteria
 from customer_segmentation_assistant.tools import CONTRACT_TYPES
 

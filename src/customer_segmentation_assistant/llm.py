@@ -1,9 +1,12 @@
 """Generate validated assistant decisions using local Ollama."""
 
 import json
-import os
 from urllib.request import Request, urlopen
 
+from customer_segmentation_assistant.config import (
+    DEFAULT_MODEL,
+    OLLAMA_BASE_URL,
+)
 from customer_segmentation_assistant.decisions import (
     ClarificationDecision,
     QueryDecision,
@@ -12,10 +15,6 @@ from customer_segmentation_assistant.decisions import (
 )
 from customer_segmentation_assistant.prompts import SYSTEM_PROMPT
 from customer_segmentation_assistant.row_limits import enforce_row_limit
-
-OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-
-DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "qwen2.5-coder:3b")
 
 DECISION_SCHEMA = {
     "anyOf": [

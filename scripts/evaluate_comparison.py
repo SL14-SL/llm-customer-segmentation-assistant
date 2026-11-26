@@ -18,8 +18,8 @@ from customer_segmentation_assistant.comparison_conversation import (
 from customer_segmentation_assistant.comparison_request import (
     extract_comparison_follow_up,
 )
+from customer_segmentation_assistant.config import DEFAULT_MODEL
 from customer_segmentation_assistant.demo_data import create_demo_database
-from customer_segmentation_assistant.llm import DEFAULT_MODEL
 
 
 def require(condition: bool, message: str) -> None:

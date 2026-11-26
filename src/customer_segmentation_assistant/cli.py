@@ -3,13 +3,14 @@ import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 
+from customer_segmentation_assistant.config import DEFAULT_MODEL
 from customer_segmentation_assistant.database import query_dataframe
 from customer_segmentation_assistant.decisions import (
     ClarificationDecision,
     UnsupportedDecision,
 )
 from customer_segmentation_assistant.export import export_csv
-from customer_segmentation_assistant.llm import DEFAULT_MODEL, generate_decision
+from customer_segmentation_assistant.llm import generate_decision
 
 MAX_CLARIFICATIONS = 3
 

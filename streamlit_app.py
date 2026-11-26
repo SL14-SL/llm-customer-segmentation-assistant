@@ -8,6 +8,7 @@ from urllib.error import URLError
 import duckdb
 import streamlit as st
 
+from customer_segmentation_assistant.config import DEFAULT_MODEL
 from customer_segmentation_assistant.database import (
     DEFAULT_DATABASE,
     query_dataframe,
@@ -16,7 +17,7 @@ from customer_segmentation_assistant.decisions import (
     ClarificationDecision,
     UnsupportedDecision,
 )
-from customer_segmentation_assistant.llm import DEFAULT_MODEL, generate_decision
+from customer_segmentation_assistant.llm import generate_decision
 from customer_segmentation_assistant.ui_theme import apply_ui_theme
 
 MAX_CLARIFICATIONS = 3
