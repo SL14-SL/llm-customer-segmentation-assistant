@@ -1,15 +1,12 @@
 """Extract and validate the scope of a contract comparison."""
 
 import json
-from urllib.request import Request, urlopen
 
 from customer_segmentation_assistant.comparison.scope import (
     check_comparison_scope,
 )
-from customer_segmentation_assistant.config import (
-    DEFAULT_MODEL,
-    OLLAMA_BASE_URL,
-)
+from customer_segmentation_assistant.config import DEFAULT_MODEL
+from customer_segmentation_assistant.llm.client import generate_structured_response
 from customer_segmentation_assistant.segments.extraction import parse_segment_criteria
 from customer_segmentation_assistant.segments.tools import CONTRACT_TYPES
 
@@ -348,39 +345,17 @@ def extract_comparison_criteria(
     if scope_decision is not None:
         return scope_decision
 
-    payload = {
-        "model": model,
-        "system": EXTRACTION_PROMPT,
-        "prompt": question,
-        "format": EXTRACTION_SCHEMA,
-        "stream": False,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": 0,
-            "num_ctx": 4096,
-            "num_predict": 256,
-        },
-    }
-    request = Request(
-        f"{OLLAMA_BASE_URL}/api/generate",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+    raw = generate_structured_response(
+        system=EXTRACTION_PROMPT,
+        prompt=question,
+        schema=EXTRACTION_SCHEMA,
+        model=model,
+        num_predict=256,
     )
-
-    with urlopen(request, timeout=180) as response:
-        generated = json.load(response)
-
-    if not generated.get("done") or generated.get("done_reason") != "stop":
-        raise ValueError("Model did not complete its extraction normally.")
-
-    raw = generated.get("response")
-
-    if not isinstance(raw, str) or not raw.strip():
-        raise ValueError("Model returned no comparison criteria.")
 
     criteria = normalize_comparison_extraction(raw)
     parse_comparison_request(json.dumps(criteria))
+
     return criteria
 
 

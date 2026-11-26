@@ -4,12 +4,9 @@ import json
 import math
 from collections.abc import Callable
 from pathlib import Path
-from urllib.request import Request, urlopen
 
-from customer_segmentation_assistant.config import (
-    DEFAULT_MODEL,
-    OLLAMA_BASE_URL,
-)
+from customer_segmentation_assistant.config import DEFAULT_MODEL
+from customer_segmentation_assistant.llm.client import generate_structured_response
 from customer_segmentation_assistant.segments.dispatch import execute_tool_call
 from customer_segmentation_assistant.segments.tools import CONTRACT_TYPES
 
@@ -66,38 +63,13 @@ def propose_next_action(
     model: str = DEFAULT_MODEL,
 ) -> dict[str, object]:
     """Propose one next action without executing it."""
-    payload = {
-        "model": model,
-        "system": AGENT_PROMPT,
-        "prompt": json.dumps(context, allow_nan=False),
-        "format": next_action_schema(context["remaining_contracts"]),
-        "stream": False,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": 0,
-            "num_ctx": 4096,
-            "num_predict": 512,
-        },
-    }
-    request = Request(
-        f"{OLLAMA_BASE_URL}/api/generate",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+    raw = generate_structured_response(
+        system=AGENT_PROMPT,
+        prompt=json.dumps(context, allow_nan=False),
+        schema=next_action_schema(context["remaining_contracts"]),
+        model=model,
+        num_predict=512,
     )
-
-    with urlopen(request, timeout=180) as response:
-        generated = json.load(response)
-
-    if not generated.get("done") or generated.get("done_reason") != "stop":
-        raise ValueError("Model did not complete its action normally.")
-
-    raw = generated.get("response")
-
-    if not isinstance(raw, str):
-        raise ValueError(  # noqa: TRY004
-            "Model returned no action."
-        )
 
     action = json.loads(raw)
 

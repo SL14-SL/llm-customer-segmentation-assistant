@@ -2,12 +2,9 @@
 
 import json
 import math
-from urllib.request import Request, urlopen
 
-from customer_segmentation_assistant.config import (
-    DEFAULT_MODEL,
-    OLLAMA_BASE_URL,
-)
+from customer_segmentation_assistant.config import DEFAULT_MODEL
+from customer_segmentation_assistant.llm.client import generate_structured_response
 from customer_segmentation_assistant.segments.tools import CONTRACT_TYPES
 
 CRITERIA_SCHEMA = {
@@ -134,37 +131,13 @@ def extract_segment_criteria(
     if not question.strip():
         raise ValueError("Question must not be empty.")
 
-    payload = {
-        "model": model,
-        "system": CRITERIA_SYSTEM_PROMPT,
-        "prompt": question,
-        "format": CRITERIA_SCHEMA,
-        "stream": False,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": 0,
-            "num_ctx": 4096,
-            "num_predict": 256,
-        },
-    }
-
-    request = Request(
-        f"{OLLAMA_BASE_URL}/api/generate",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+    raw = generate_structured_response(
+        system=CRITERIA_SYSTEM_PROMPT,
+        prompt=question,
+        schema=CRITERIA_SCHEMA,
+        model=model,
+        num_predict=256,
     )
-
-    with urlopen(request, timeout=180) as response:
-        result = json.load(response)
-
-    if not result.get("done") or result.get("done_reason") != "stop":
-        raise ValueError("Local model did not complete its response normally.")
-
-    raw = result.get("response")
-
-    if not isinstance(raw, str) or not raw.strip():
-        raise ValueError("Local model returned no segment criteria.")
 
     return parse_segment_criteria(raw)
 

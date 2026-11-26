@@ -1,12 +1,9 @@
 """Explain aggregate tool results using the local language model."""
 
 import json
-from urllib.request import Request, urlopen
 
-from customer_segmentation_assistant.config import (
-    DEFAULT_MODEL,
-    OLLAMA_BASE_URL,
-)
+from customer_segmentation_assistant.config import DEFAULT_MODEL
+from customer_segmentation_assistant.llm.client import generate_structured_response
 
 SUMMARY_SYSTEM_PROMPT = """
 Explain the supplied customer-segment tool result in concise English.
@@ -60,37 +57,14 @@ def explain_segment_result(
         raise ValueError(f"Missing result fields: {sorted(missing)}")
 
     aggregate = {name: result[name] for name in RESULT_FIELDS}
-    payload = {
-        "model": model,
-        "system": SUMMARY_SYSTEM_PROMPT,
-        "prompt": json.dumps(aggregate, allow_nan=False),
-        "format": SUMMARY_SCHEMA,
-        "stream": False,
-        "keep_alive": "10m",
-        "options": {
-            "temperature": 0,
-            "num_ctx": 4096,
-            "num_predict": 256,
-        },
-    }
 
-    request = Request(
-        f"{OLLAMA_BASE_URL}/api/generate",
-        data=json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
-        method="POST",
+    raw = generate_structured_response(
+        system=SUMMARY_SYSTEM_PROMPT,
+        prompt=json.dumps(aggregate, allow_nan=False),
+        schema=SUMMARY_SCHEMA,
+        model=model,
+        num_predict=256,
     )
-
-    with urlopen(request, timeout=180) as response:
-        generated = json.load(response)
-
-    if not generated.get("done") or generated.get("done_reason") != "stop":
-        raise ValueError("Local model did not complete its response normally.")
-
-    raw = generated.get("response")
-
-    if not isinstance(raw, str) or not raw.strip():
-        raise ValueError("Local model returned no explanation.")
 
     explanation = json.loads(raw)
 

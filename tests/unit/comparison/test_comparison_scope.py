@@ -87,7 +87,7 @@ def test_unsupported_request_does_not_call_ollama(monkeypatch):
 
     monkeypatch.setattr(
         comparison_request,
-        "urlopen",
+        "generate_structured_response",
         unexpected_model_call,
     )
 
@@ -104,7 +104,7 @@ def test_unsupported_follow_up_does_not_call_ollama(monkeypatch):
 
     monkeypatch.setattr(
         comparison_request,
-        "urlopen",
+        "generate_structured_response",
         unexpected_model_call,
     )
 
