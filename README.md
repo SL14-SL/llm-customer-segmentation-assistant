@@ -40,7 +40,8 @@ a shared Ollama server and separate synthetic datasets.
 
 - Docker Desktop or Docker Engine with Docker Compose
 - Internet access for the initial image and model downloads
-- Sufficient local memory and storage for the language model
+- Sufficient local memory and storage for both language models
+- Additional computational resources for the 14B comparison model
 
 No local Python installation, Ollama installation or upstream
 churn prediction project is required.
@@ -55,25 +56,40 @@ docker compose up --build -d
 
 Once startup completes, open:
 
-| Application | URL | Demo dataset |
-| --- | --- | --- |
-| Text-to-SQL Assistant | http://localhost:8502 | 300 synthetic customers |
-| Segment Comparison | http://localhost:8503 | 6 synthetic customers |
+| Application | URL | Demo dataset | Default model |
+| --- | --- | --- | --- |
+| Text-to-SQL Assistant | http://localhost:8502 | 300 synthetic customers | `qwen2.5-coder:3b` |
+| Segment Comparison | http://localhost:8503 | 6 synthetic customers | `qwen2.5:14b` |
 
-Both applications use the same Ollama container and language model.
+Both applications share one Ollama server but use independently
+configurable language models.
 
 The first startup downloads the required container images, Python
-dependencies and language model. The applications wait until the
-model initialization has completed successfully.
+dependencies and language models. The default models require
+approximately 11 GB of model storage, in addition to Docker images
+and application data.
+
+Each application waits until its model initialization has
+completed successfully. Model initialization runs sequentially.
 
 This configuration uses CPU inference. Response times depend on
 hardware, model size and current system load.
 
+The 14B comparison model requires substantially more computational
+resources than the 3B Text-to-SQL model. On resource-constrained
+systems, avoid simultaneous requests to both applications.
+
+Initial model loading and concurrent inference may cause requests
+to exceed the configured network timeout.
+
 Check startup progress:
 
 ```bash
-docker compose logs -f model-init
-docker compose ps
+docker compose logs -f model-init comparison-model-init
+```
+
+```bash
+docker compose ps -a
 ```
 
 Application logs:
@@ -259,8 +275,8 @@ flowchart TD
     U --> A["Text-to-SQL Assistant<br/>localhost:8502"]
     U --> B["Segment Comparison<br/>localhost:8503"]
 
-    A --> O["Shared Ollama server"]
-    B --> O
+    A -->|"3B model"| O["Shared Ollama server"]
+    B -->|"14B model"| O
 
     A --> D1["DuckDB<br/>300 synthetic customers"]
     B --> D2["DuckDB<br/>6 synthetic customers"]
@@ -269,7 +285,9 @@ flowchart TD
     D1 --> V2["Persistent demo volume"]
     D2 --> V3["Persistent comparison volume"]
 
-    M["Model initialization"] --> O
+    M1["Text-to-SQL model initialization"] --> O
+    M2["Comparison model initialization"] --> O
+    M1 -.-> M2
 ```
 
 Both applications use the same project image configuration and
@@ -277,8 +295,11 @@ share the Ollama server.
 
 Their datasets are stored separately in persistent volumes.
 
-The model initialization service downloads the configured language
-model before the applications start.
+Two sequential model initialization services download the
+configured language models before the dependent applications start.
+
+Both models are stored in the same persistent Ollama volume.
+The applications can select different models independently.
 
 ### Text-to-SQL execution flow
 
@@ -319,17 +340,24 @@ included in the model prompt.
 
 ### Bounded comparison execution flow
 
+### Bounded comparison execution flow
+
 ```mermaid
 flowchart TD
-    A["User message"] --> B["Model extracts criteria"]
-    B --> C["Python validates and retains criteria"]
+    A["User message"] --> S["Deterministic scope guard"]
 
-    C --> D{"Criteria complete?"}
+    S -->|Known unsupported requirement| X["Explain unsupported requirement"]
+    S -->|No known violation| B["Model extracts criteria and requirements"]
 
-    D -->|No| E["Ask for missing criteria"]
+    B --> C["Python validates and normalizes criteria"]
+
+    C --> D{"Decision"}
+
+    D -->|Unsupported| X
+    D -->|Clarification| E["Ask for missing criteria"]
     E --> A
 
-    D -->|Yes| F["User reviews filters"]
+    D -->|Comparison| F["User reviews filters"]
     F --> G["User starts comparison"]
 
     G --> H["Model selects permitted action"]
@@ -342,22 +370,48 @@ flowchart TD
     I -->|Finish| L["Verify complete segment coverage"]
     L --> M["Render deterministic report"]
     M --> N["Optional JSON download"]
+
+    X --> R["Start a new comparison"]
+    R --> A
 ```
 
 The comparison workflow separates language understanding from
-data access, execution control and numerical computation.
+scope validation, data access, execution control and numerical
+computation.
 
 | Responsibility | Implementation |
 | --- | --- |
+| Detect known unsupported requirements | Deterministic Python scope guard |
 | Interpret natural language | LLM |
 | Extract comparison criteria | LLM |
+| Identify additional unsupported requirements | LLM |
+| Validate and normalize probability thresholds | Python |
 | Retain conversation criteria | Python |
-| Validate supported comparison scope | Python |
+| Confirm recognized comparison criteria | User |
 | Select a permitted next action | LLM |
 | Restrict available actions | Python |
 | Execute aggregate queries | DuckDB |
 | Verify execution completeness | Python |
 | Generate the final report | Python |
+
+The scope guard checks both initial requests and clarification
+answers before model-based extraction.
+
+Known unsupported requirements can therefore be rejected without
+model inference or database queries.
+
+The model additionally identifies unsupported requirements that
+are not covered by the deterministic rules.
+
+Extracted probability thresholds are validated and rounded to
+12 decimal places to remove numerical artifacts such as
+`0.7000000000000001` instead of `0.7`.
+
+This normalization also prevents equivalent thresholds from
+being interpreted as different comparison conditions.
+
+The scope guard provides an additional validation layer, not
+a complete natural-language verification system.
 
 The model receives computed aggregate observations after each
 tool call. It does not receive individual customer rows in
@@ -581,11 +635,21 @@ uv sync
 Install Ollama using the
 [official instructions](https://ollama.com/).
 
-Download the default model:
+Download the models required for the two applications:
 
 ```bash
 ollama pull qwen2.5-coder:3b
+ollama pull qwen2.5:14b
 ```
+
+The 3B model is used for Text-to-SQL and single-segment
+tool-decision evaluation.
+
+The 14B model is recommended for the bounded comparison
+application and its end-to-end evaluation.
+
+If only the Text-to-SQL application is required, downloading
+the larger model is not necessary.
 
 If Ollama is not already running as a service:
 
@@ -610,6 +674,7 @@ uv run python -m customer_segmentation_assistant.text_sql_demo
 Start the application:
 
 ```bash
+OLLAMA_MODEL=qwen2.5-coder:3b \
 CUSTOMER_DATABASE=data/text_sql_demo.duckdb \
 SYNTHETIC_DEMO=1 \
 uv run streamlit run streamlit_app.py \
@@ -630,6 +695,7 @@ again.
 In a separate terminal:
 
 ```bash
+OLLAMA_MODEL=qwen2.5:14b \
 uv run streamlit run streamlit_agent_demo.py \
   --server.address 127.0.0.1 \
   --server.port 8503
@@ -703,18 +769,27 @@ uses `data/customers.duckdb`.
 
 | Environment variable | Default | Purpose |
 | --- | --- | --- |
-| `OLLAMA_MODEL` | `qwen2.5-coder:3b` | Language model |
+| `OLLAMA_MODEL` | `qwen2.5-coder:3b` | Model used by local Python processes and the Docker Text-to-SQL service |
+| `COMPARISON_OLLAMA_MODEL` | `qwen2.5:14b` | Model selected for the Docker comparison service |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama server address |
 | `CUSTOMER_DATABASE` | `data/customers.duckdb` | Text-to-SQL database |
 | `SYNTHETIC_DEMO` | Unset | Enable synthetic-data notice when set to `1` |
 
-All model integrations use the shared Ollama configuration.
+All model integrations use the shared Ollama endpoint
+configuration.
 
 Within Docker, both applications connect to:
 
 ```text
 http://ollama:11434
 ```
+
+Docker Compose maps `COMPARISON_OLLAMA_MODEL` to the
+`OLLAMA_MODEL` environment variable inside the comparison
+container.
+
+For local execution without Docker, use `OLLAMA_MODEL`
+to select the model for each Python process independently.
 
 The Docker Text-to-SQL service selects the generated
 300-customer database and enables the synthetic-data notice.
@@ -885,6 +960,34 @@ Two year
 The comparison tool uses fixed parameterized aggregate SQL
 rather than SQL generated by the model.
 
+Known unsupported requirements are checked by a deterministic
+scope guard before model-based extraction.
+
+Examples include:
+
+- Customer tenure conditions.
+- Filters on monthly charges.
+- Additional customer attributes such as age, gender or payment method.
+
+For example:
+
+```text
+Compare monthly and annual contracts with churn probability
+at least 60%, but only customers with tenure of at least 24 months.
+```
+
+The request is rejected because the comparison application
+does not support customer tenure filters.
+
+The scope guard also checks clarification answers.
+
+Additional unsupported requirements are checked during
+model-based criteria extraction.
+
+These checks reduce the risk of silently ignored conditions
+but cannot guarantee complete interpretation of arbitrary
+natural-language requests.
+
 ### Example dialogue
 
 Enter:
@@ -949,6 +1052,14 @@ distinguished.
 Results are queried only after the user selects
 **Run this comparison**.
 
+Unsupported requirements block comparison execution for
+the current conversation.
+
+The interface displays the detected limitation instead of
+offering an execution button.
+
+Select **New comparison** to start a separate supported request.
+
 ### Download results
 
 Select **Download computed results** to download the
@@ -999,23 +1110,25 @@ with a running Ollama model.
 
 ### Evaluation overview
 
-| Validation | Reported result |
-| --- | --- |
-| Automated tests | 143 passed |
-| Ruff linting | Passed |
-| Text-to-SQL reference evaluation | 9/9 cases |
-| Single-segment tool-decision evaluation | 7/7 automatic checks |
-| Comparison end-to-end evaluation | 8/8 cases |
-| Docker startup and health checks | Passed |
-| Docker Text-to-SQL functional smoke test | Passed |
-| Docker comparison functional smoke test | Passed |
+Development results recorded on 2026-11-26:
 
-The automated test count and Docker results reflect the
-development state verified on 2026-11-26.
+| Validation | Model | Result |
+| --- | --- | --- |
+| Automated tests | Not required | 179 passed |
+| Ruff linting | Not required | Passed |
+| Text-to-SQL reference evaluation | `qwen2.5-coder:3b` | 8/9 cases; failed case passed on targeted rerun |
+| Single-segment tool-decision evaluation | `qwen2.5-coder:3b` | 7/7 automatic checks |
+| Comparison clarification check | `qwen2.5:14b` | Passed |
+| Comparison end-to-end evaluation | `qwen2.5:14b` | 8/8 cases |
+| Docker startup and health checks | Both default models | Passed |
+| Docker Text-to-SQL functional smoke test | `qwen2.5-coder:3b` | Passed |
+| Docker comparison criteria and clarification | `qwen2.5:14b` | Passed |
+| Docker deterministic scope rejection | Not required | Passed |
 
-The live-model evaluation results are recorded development
-results from earlier runs. They are not newly established
-by the latest automated tests or Docker smoke tests.
+The evaluation suites are small development reference suites,
+not independent general-accuracy benchmarks.
+
+Results depend on the selected model and implementation version.
 
 ### Automated checks
 
@@ -1038,6 +1151,12 @@ The test suite covers:
 - Export behavior.
 - Tool argument validation.
 - Comparison criteria validation.
+- Probability threshold normalization.
+- Inclusive probability boundary handling.
+- Equivalent probability threshold handling.
+- Deterministic scope validation.
+- Unsupported requirements in clarification answers.
+- Rejection before model inference.
 - State-dependent action restrictions.
 - Tool-call limits.
 - Deterministic result reporting.
@@ -1052,11 +1171,26 @@ accuracy.
 ### Text-to-SQL reference evaluation
 
 ```bash
+OLLAMA_MODEL=qwen2.5-coder:3b \
 uv run python scripts/evaluate_assistant.py
 ```
 
-The previously recorded development run passed
-9 of 9 reference cases.
+A historical development run passed 9 of 9 reference cases.
+
+The complete run on 2026-11-26 passed 8 of 9 cases.
+The remaining clarification follow-up case passed after
+improvements to the evaluation script and targeted re-execution.
+
+Run the clarification case independently:
+
+```bash
+OLLAMA_MODEL=qwen2.5-coder:3b \
+uv run python scripts/evaluate_assistant.py \
+  --case high_risk_after_clarification
+```
+
+The targeted result does not constitute a new complete
+9/9 evaluation run.
 
 Covered behaviors include:
 
@@ -1081,12 +1215,12 @@ included in these nine reference cases.
 ### Single-segment tool-decision evaluation
 
 ```bash
+OLLAMA_MODEL=qwen2.5-coder:3b \
 uv run python scripts/evaluate_tools.py
 ```
 
-After separating criteria extraction from Python decision
-logic, the recorded development run passed 7 of 7
-automatic checks.
+The development run on 2026-11-26 passed 7 of 7 automatic
+checks.
 
 Clarification wording was additionally reviewed manually.
 
@@ -1096,11 +1230,15 @@ the complete comparison agent.
 ### Comparison clarification check
 
 ```bash
+OLLAMA_MODEL=qwen2.5:14b \
 uv run python scripts/check_comparison_dialogue.py
 ```
 
 This live-model check verifies that a threshold follow-up
 preserves the previously selected contract types.
+
+The check passed on 2026-11-26 using the recommended
+14B comparison model.
 
 It requires a running Ollama model.
 
@@ -1111,8 +1249,12 @@ OLLAMA_MODEL=qwen2.5:14b \
 uv run python scripts/evaluate_comparison.py
 ```
 
-The recorded development run on 2026-11-11 passed
-8 of 8 cases using `qwen2.5:14b`.
+The development run on 2026-11-26 passed all 8 cases
+using `qwen2.5:14b`, including the updated criteria
+extraction and deterministic scope guard.
+
+A historical run on 2026-11-11 also passed all 8 cases
+with the same model.
 
 Covered behaviors include:
 
@@ -1125,32 +1267,90 @@ Covered behaviors include:
 - Rejection of different per-segment thresholds.
 - Rejection of additional filters in follow-up messages.
 
-This result applies to the tested model and development cases.
-It should not be interpreted as an 8/8 result for the smaller
-default model.
+The smaller `qwen2.5-coder:3b` model produced less reliable
+comparison results during development.
+
+Observed failure modes included incomplete contract extraction
+and omitted unsupported requirements.
+
+For this reason, `qwen2.5:14b` is the default Docker comparison
+model and the recommended model for local comparison evaluation.
+
+The 8/8 result applies to the tested 14B model and reference
+cases. It does not establish equivalent accuracy for smaller
+models or arbitrary user requests.
+
+### Targeted evaluation runs
+
+The Text-to-SQL and comparison evaluation scripts support
+the optional `--case` argument.
+
+For example:
+
+```bash
+OLLAMA_MODEL=qwen2.5:14b \
+uv run python scripts/evaluate_comparison.py \
+  --case both_segments_empty
+```
+
+Multiple cases can be selected:
+
+```bash
+OLLAMA_MODEL=qwen2.5:14b \
+uv run python scripts/evaluate_comparison.py \
+  --case both_segments_empty \
+  --case threshold_follow_up
+```
+
+Without `--case`, the complete reference suite is executed.
+
+Targeted runs reduce inference time during debugging and
+regression analysis.
+
+A targeted run does not replace a complete evaluation after
+changes affecting shared prompts or execution logic.
 
 ### Docker verification
 
-Both containerized interfaces were manually verified
-on 2026-11-26 using the default model
-`qwen2.5-coder:3b`.
+Both containerized interfaces were manually tested
+on 2026-11-26.
 
-Verified behavior:
+The earlier Docker configuration used the smaller
+`qwen2.5-coder:3b` model for both applications.
 
-- Successful model initialization.
+The updated configuration was additionally verified with
+separate models:
+
+- Text-to-SQL: `qwen2.5-coder:3b`.
+- Segment Comparison: `qwen2.5:14b`.
+
+Verified behavior includes:
+
+- Successful initialization of both models.
 - Healthy Ollama server.
 - Healthy Text-to-SQL application.
 - Healthy comparison application.
+- Independent application model configuration.
 - Successful communication with the shared Ollama server.
 - Text-to-SQL query returning the expected 300 customers.
-- Comparison criteria extraction.
-- Correct comparison of monthly and annual contracts
-  with a 70% minimum churn probability.
-- Two successful comparison tool calls.
-- Correct deterministic comparison report.
-- Creation and presence of the comparison DuckDB database.
-- Reuse of the existing Text-to-SQL database.
+- Comparison contract extraction and clarification with the 14B model.
+- Correct preservation of the selected contracts.
+- Correct normalization of the probability threshold.
+- Deterministic rejection of unsupported tenure filters.
+- Correct display of unsupported requirements in the comparison interface.
+- Persistent model and database volumes.
 - Shared application theme available inside Docker.
+
+The earlier 3B Docker smoke test also verified the complete
+comparison report for monthly and annual contracts with a
+70% minimum churn probability.
+
+The complete updated comparison workflow with the 14B model
+was verified through the local end-to-end evaluation.
+
+On resource-constrained hardware, concurrent requests to the
+two Docker applications caused timeouts during manual testing.
+Sequential interpretation requests completed successfully.
 
 These smoke tests verify the exercised workflows.
 They do not replace the complete live-model evaluation.
@@ -1166,14 +1366,20 @@ than independent general-accuracy benchmarks.
 Results depend on the tested model, model configuration,
 dataset and evaluation cases.
 
-Model responses, timings, dialogues, actions and evaluation
-reports are saved under:
+Deterministic scope checks cover known unsupported patterns
+but cannot guarantee complete interpretation of natural
+language.
+
+The comparison interface requires the user to review the
+recognized filters before execution.
+
+Generated evaluation reports are stored under:
 
 ```text
 data/evaluation/
 ```
 
-Generated evaluation results are excluded from Git.
+These local evaluation artifacts are excluded from Git.
 
 ## Scope and limitations
 
@@ -1204,6 +1410,13 @@ Generated evaluation results are excluded from Git.
   requested criteria.
 - Visible filters define the comparison actually executed.
 - No durable conversation state.
+- Deterministic scope checks cover known unsupported patterns,
+  not all possible natural-language requirements.
+- Conservative pattern checks may reject requests that merely
+  mention an unsupported attribute.
+- Model-generated probability thresholds are normalized to
+  12 decimal places.
+- Comparison accuracy depends on the selected language model.
 
 ### Project-wide limitations
 
@@ -1222,6 +1435,22 @@ prompt processing and system load.
 
 Initial requests may take substantially longer than
 subsequent requests.
+
+The default Docker configuration uses two language models
+with approximately 11 GB of combined model storage.
+
+The 14B comparison model requires more memory and
+computational resources than the 3B Text-to-SQL model.
+
+On resource-constrained systems, requests should be executed
+sequentially rather than concurrently.
+
+Concurrent inference, model switching and initial model
+loading may cause requests to exceed the current 180-second
+network timeout.
+
+This timeout applies to individual model requests rather
+than the entire comparison workflow.
 
 Larger language models may improve some interpretation tasks
 but require additional computational resources.
@@ -1266,6 +1495,7 @@ customer-segmentation-assistant/
 │       ├── cli.py
 │       ├── comparison_conversation.py
 │       ├── comparison_request.py
+│       ├── comparison_scope.py
 │       ├── conversation.py
 │       ├── database.py
 │       ├── decisions.py
@@ -1274,6 +1504,7 @@ customer-segmentation-assistant/
 │       ├── llm.py
 │       ├── prompts.py
 │       ├── result_summary.py
+│       ├── row_limits.py
 │       ├── sql_policy.py
 │       ├── text_sql_demo.py
 │       ├── tool_dispatch.py
@@ -1302,7 +1533,7 @@ documentation and evaluation files.
 | `streamlit_app.py` | Text-to-SQL browser interface |
 | `streamlit_agent_demo.py` | Comparison interface and execution confirmation |
 | `agent.py` | Bounded agent loop and deterministic reporting |
-| `comparison_request.py` | Comparison criteria and scope extraction |
+| `comparison_request.py` | Model-based criteria extraction, scope validation and probability normalization |
 | `comparison_conversation.py` | Stateful comparison criteria |
 | `conversation.py` | Single-segment clarification state |
 | `database.py` | Read-only DuckDB query execution |
@@ -1323,6 +1554,8 @@ documentation and evaluation files.
 | `scripts/` | Live-model evaluation scripts |
 | `tests/` | Automated software tests |
 | `compose.yaml` | Self-contained local Docker deployment |
+| `comparison_scope.py` | Deterministic detection of known unsupported comparison requirements |
+| `row_limits.py` | Deterministic enforcement of requested result limits |
 
 ## Project context
 
