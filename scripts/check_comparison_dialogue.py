@@ -1,6 +1,7 @@
 """Check a comparison clarification dialogue using the local model."""
 
 import json
+from math import isclose
 
 from customer_segmentation_assistant.comparison_conversation import (
     ComparisonConversation,
@@ -34,7 +35,12 @@ def main() -> None:
         "Month-to-month",
         "One year",
     }
-    assert decision["arguments"]["minimum_churn_probability"] == 0.7
+    assert isclose(
+        decision["arguments"]["minimum_churn_probability"],
+        0.7,
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    )
 
     print("\nComparison clarification state: OK")
 

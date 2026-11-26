@@ -87,11 +87,9 @@ def parse_segment_criteria(raw: str) -> dict[str, object]:
             or not math.isfinite(threshold)
             or not 0 <= threshold <= 1
         ):
-            raise ValueError(
-                "Minimum probability must be a finite number from 0 to 1."
-            )
+            raise ValueError("Minimum probability must be a finite number from 0 to 1.")
 
-        threshold = float(threshold)
+        threshold = round(float(threshold), 12)
 
     return {
         "contract": contract,
@@ -106,9 +104,7 @@ def parse_tool_decision(raw: str) -> dict[str, object]:
     threshold_missing = criteria["minimum_churn_probability"] is None
 
     if contract_missing and threshold_missing:
-        question = (
-            "Which contract type and minimum churn probability should I use?"
-        )
+        question = "Which contract type and minimum churn probability should I use?"
     elif contract_missing:
         question = "Which contract type should I use?"
     elif threshold_missing:

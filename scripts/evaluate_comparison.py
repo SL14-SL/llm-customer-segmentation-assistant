@@ -1,5 +1,6 @@
 """Evaluate comparison interpretation, dialogue and real tool execution."""
 
+import argparse
 import json
 import math
 from datetime import UTC, datetime
@@ -38,11 +39,13 @@ def evaluate_case(case, database, record):
             model=DEFAULT_MODEL,
         )
         decision = conversation.update(extracted)
-        record["turns"].append({
-            "message": message,
-            "extracted": extracted,
-            "decision": decision,
-        })
+        record["turns"].append(
+            {
+                "message": message,
+                "extracted": extracted,
+                "decision": decision,
+            }
+        )
 
         if index < len(case["messages"]) - 1:
             require(
@@ -87,8 +90,7 @@ def evaluate_case(case, database, record):
     record["result"] = result
 
     observed = {
-        item["result"]["contract"]: item["result"]
-        for item in result["observations"]
+        item["result"]["contract"]: item["result"] for item in result["observations"]
     }
     require(
         set(observed) == set(case["expected_metrics"]),
@@ -122,10 +124,23 @@ def evaluate_case(case, database, record):
 
 
 def main() -> int:
-    """Run new cases on a fresh synthetic database and save all outcomes."""
+    """Run selected cases on a fresh synthetic database and save all outcomes."""
     cases = json.loads(
         Path("evaluation/comparison_cases.json").read_text(encoding="utf-8")
     )
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--case",
+        action="append",
+        choices=[case["id"] for case in cases],
+        help="Run only the selected comparison case. Can be repeated.",
+    )
+    args = parser.parse_args()
+
+    if args.case:
+        cases = [case for case in cases if case["id"] in args.case]
+
     records = []
 
     with TemporaryDirectory() as directory:
@@ -163,7 +178,8 @@ def main() -> int:
             {"model": DEFAULT_MODEL, "cases": records},
             indent=2,
             ensure_ascii=False,
-        ) + "\n",
+        )
+        + "\n",
         encoding="utf-8",
     )
 

@@ -1,7 +1,12 @@
 """Verify segment summaries using independent synthetic expectations."""
 
+import json
+
 import pytest
 
+from customer_segmentation_assistant.comparison_request import (
+    normalize_comparison_extraction,
+)
 from customer_segmentation_assistant.demo_data import create_demo_database
 from customer_segmentation_assistant.tools import summarize_segment
 
@@ -34,9 +39,7 @@ def test_segment_summary(
 
     assert result["customer_count"] == 2
     assert result["average_monthly_charges"] == pytest.approx(expected_charge)
-    assert result["average_churn_probability"] == pytest.approx(
-        expected_probability
-    )
+    assert result["average_churn_probability"] == pytest.approx(expected_probability)
     assert result["contract"] == contract
     assert result["minimum_churn_probability"] == 0.65
     assert "customerID" not in result
@@ -86,3 +89,26 @@ def test_demo_creation_preserves_existing_database(demo_database):
         database=demo_database,
     )
     assert result["customer_count"] == 3
+
+
+def test_normalized_threshold_includes_boundary_customer(demo_database):
+    criteria = normalize_comparison_extraction(
+        json.dumps(
+            {
+                "contracts": ["Month-to-month", "One year"],
+                "minimum_probabilities": [0.7000000000000001],
+                "unsupported_requirements": [],
+            }
+        )
+    )
+
+    result = summarize_segment(
+        contract="Month-to-month",
+        minimum_churn_probability=criteria["minimum_churn_probability"],
+        database=demo_database,
+    )
+
+    assert result["customer_count"] == 2
+    assert result["minimum_churn_probability"] == 0.7
+    assert result["average_monthly_charges"] == pytest.approx(75.0)
+    assert result["average_churn_probability"] == pytest.approx(0.75)

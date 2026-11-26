@@ -35,10 +35,12 @@ def test_asks_only_for_missing_criteria(
     threshold,
     expected_question,
 ):
-    raw = json.dumps({
-        "contract": contract,
-        "minimum_churn_probability": threshold,
-    })
+    raw = json.dumps(
+        {
+            "contract": contract,
+            "minimum_churn_probability": threshold,
+        }
+    )
 
     assert parse_tool_decision(raw) == {
         "kind": "clarification",
@@ -61,10 +63,12 @@ def test_complete_criteria_create_tool_call(threshold):
 
 
 def test_zero_threshold_with_missing_contract_asks_only_for_contract():
-    raw = json.dumps({
-        "contract": None,
-        "minimum_churn_probability": 0.0,
-    })
+    raw = json.dumps(
+        {
+            "contract": None,
+            "minimum_churn_probability": 0.0,
+        }
+    )
 
     assert parse_tool_decision(raw) == {
         "kind": "clarification",
@@ -93,3 +97,26 @@ def test_zero_threshold_with_missing_contract_asks_only_for_contract():
 def test_rejects_invalid_criteria(raw):
     with pytest.raises(ValueError):
         parse_segment_criteria(raw)
+
+
+@pytest.mark.parametrize(
+    ("raw_threshold", "expected"),
+    [
+        (0.7000000000000001, 0.7),
+        (0.6499999999999999, 0.65),
+        (0.723456, 0.723456),
+        (0.0, 0.0),
+        (1.0, 1.0),
+    ],
+)
+def test_normalizes_probability_artifacts(raw_threshold, expected):
+    criteria = parse_segment_criteria(
+        json.dumps(
+            {
+                "contract": "Month-to-month",
+                "minimum_churn_probability": raw_threshold,
+            }
+        )
+    )
+
+    assert criteria["minimum_churn_probability"] == expected
