@@ -3,6 +3,9 @@
 import json
 from urllib.request import Request, urlopen
 
+from customer_segmentation_assistant.comparison_scope import (
+    check_comparison_scope,
+)
 from customer_segmentation_assistant.llm import DEFAULT_MODEL, OLLAMA_BASE_URL
 from customer_segmentation_assistant.tool_llm import parse_segment_criteria
 from customer_segmentation_assistant.tools import CONTRACT_TYPES
@@ -140,10 +143,14 @@ def parse_comparison_request(raw: str) -> dict[str, object]:
     if len(set(contracts)) != len(contracts):
         raise ValueError("Comparison contracts must be distinct.")
 
-    validated = parse_segment_criteria(json.dumps({
-        "contract": None,
-        "minimum_churn_probability": criteria["minimum_churn_probability"],
-    }))
+    validated = parse_segment_criteria(
+        json.dumps(
+            {
+                "contract": None,
+                "minimum_churn_probability": criteria["minimum_churn_probability"],
+            }
+        )
+    )
     threshold = validated["minimum_churn_probability"]
 
     if len(contracts) < 2 and threshold is None:
@@ -168,6 +175,7 @@ def parse_comparison_request(raw: str) -> dict[str, object]:
         "kind": "clarification",
         "question": question,
     }
+
 
 EXTRACTION_SCHEMA = {
     "type": "object",
@@ -206,10 +214,21 @@ Extract every requirement from the user's comparison request.
 Return JSON only.
 
 contracts:
-Explicitly selected contract types.
-monthly = Month-to-month
-annual/yearly = One year
-two-year = Two year
+List ALL explicitly selected contract types.
+Return each selected contract as a separate array item.
+
+Supported mappings:
+- monthly, month-to-month = Month-to-month
+- annual, yearly, one-year, one year = One year
+- two-year, two year = Two year
+
+When multiple contract types are connected by "and", commas,
+or other enumeration phrases, extract every selected type.
+Do not stop after recognizing the first contract.
+
+Do not invent contract types.
+Do not include excluded or negated contract types.
+Do not repeat contract types.
 Use [] if absent.
 
 minimum_probabilities:
@@ -249,6 +268,7 @@ def normalize_comparison_extraction(raw: str) -> dict[str, object]:
         "minimum_probabilities",
         "unsupported_requirements",
     }
+
     if not isinstance(extracted, dict) or set(extracted) != expected_fields:
         raise ValueError("Invalid comparison extraction.")
 
@@ -258,29 +278,40 @@ def normalize_comparison_extraction(raw: str) -> dict[str, object]:
     if not isinstance(probabilities, list) or not isinstance(requirements, list):
         raise TypeError("Extracted requirements must be lists.")
 
-    if any(
-        not isinstance(item, str) or not item.strip()
-        for item in requirements
-    ):
+    if any(not isinstance(item, str) or not item.strip() for item in requirements):
         raise ValueError("Invalid unsupported requirement.")
 
-    # Reuse existing validation for contracts and each probability.
-    parse_comparison_request(json.dumps({
-        "contracts": extracted["contracts"],
-        "minimum_churn_probability": None,
-    }))
+    parse_comparison_request(
+        json.dumps(
+            {
+                "contracts": extracted["contracts"],
+                "minimum_churn_probability": None,
+            }
+        )
+    )
+
+    normalized_probabilities = []
 
     for probability in probabilities:
-        parse_segment_criteria(json.dumps({
-            "contract": None,
-            "minimum_churn_probability": probability,
-        }))
-        if probability is None:
+        validated = parse_segment_criteria(
+            json.dumps(
+                {
+                    "contract": None,
+                    "minimum_churn_probability": probability,
+                }
+            )
+        )
+
+        threshold = validated["minimum_churn_probability"]
+
+        if threshold is None:
             raise ValueError("Extracted probabilities cannot be null.")
+
+        normalized_probabilities.append(threshold)
 
     problems = [item.strip() for item in requirements]
 
-    if len(set(probabilities)) > 1:
+    if len(set(normalized_probabilities)) > 1:
         problems.append(
             "Different probability thresholds are not supported; "
             "this comparison requires one shared minimum."
@@ -295,9 +326,10 @@ def normalize_comparison_extraction(raw: str) -> dict[str, object]:
     return {
         "contracts": extracted["contracts"],
         "minimum_churn_probability": (
-            probabilities[0] if probabilities else None
+            normalized_probabilities[0] if normalized_probabilities else None
         ),
     }
+
 
 def extract_comparison_criteria(
     question: str,
@@ -307,6 +339,11 @@ def extract_comparison_criteria(
     """Extract comparison criteria without executing database queries."""
     if not question.strip():
         raise ValueError("Question must not be empty.")
+
+    scope_decision = check_comparison_scope(question)
+
+    if scope_decision is not None:
+        return scope_decision
 
     payload = {
         "model": model,
@@ -361,6 +398,10 @@ def extract_comparison_follow_up(
     model: str = DEFAULT_MODEL,
 ) -> dict[str, object]:
     """Interpret clarification answers with the known comparison context."""
+    scope_decision = check_comparison_scope(question)
+
+    if scope_decision is not None:
+        return scope_decision
     contracts = current_criteria["contracts"]
     threshold = current_criteria["minimum_churn_probability"]
 
@@ -390,9 +431,7 @@ def extract_comparison_follow_up(
     if awaiting_threshold:
         return {
             "contracts": [],
-            "minimum_churn_probability": (
-                extracted["minimum_churn_probability"]
-            ),
+            "minimum_churn_probability": (extracted["minimum_churn_probability"]),
         }
 
     return extracted

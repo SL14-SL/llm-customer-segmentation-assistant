@@ -1,5 +1,6 @@
 """Evaluate local assistant decisions against reference cases."""
 
+import argparse
 import json
 from pathlib import Path
 from time import perf_counter
@@ -16,9 +17,20 @@ from customer_segmentation_assistant.llm import generate_decision
 
 def main() -> None:
     """Run reference questions and report individual outcomes."""
-    cases = json.loads(
-        Path("evaluation/cases.json").read_text(encoding="utf-8")
+    cases = json.loads(Path("evaluation/cases.json").read_text(encoding="utf-8"))
+
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--case",
+        action="append",
+        choices=[case["id"] for case in cases],
+        help="Run only the selected reference case. Can be repeated.",
     )
+    args = parser.parse_args()
+
+    if args.case:
+        cases = [case for case in cases if case["id"] in args.case]
+
     passed = 0
 
     for case in cases:
@@ -26,7 +38,10 @@ def main() -> None:
         started = perf_counter()
 
         try:
-            decision = generate_decision(case["question"])
+            decision = generate_decision(
+                case["question"],
+                customer_messages=[case["question"]],
+            )
 
             if "clarification_answer" in case:
                 if not isinstance(decision, ClarificationDecision):
@@ -48,8 +63,14 @@ def main() -> None:
                     "supplied."
                 )
 
-                decision = generate_decision(current_request)
-                
+                decision = generate_decision(
+                    current_request,
+                    customer_messages=[
+                        case["question"],
+                        case["clarification_answer"],
+                    ],
+                )
+
             if case.get("expected_behavior") == "clarify":
                 if not isinstance(decision, ClarificationDecision):
                     raise AssertionError("Expected a clarification.")
@@ -58,7 +79,9 @@ def main() -> None:
                 print("Review manually whether it asks about the risk threshold.")
             else:
                 if not isinstance(decision, QueryDecision):
-                    raise AssertionError("Expected a SQL query.")
+                    raise AssertionError(
+                        f"Expected a SQL query, received: {decision!r}"
+                    )
 
                 expected = query_dataframe(case["expected_sql"])
                 actual = query_dataframe(decision.sql)

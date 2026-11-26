@@ -10,10 +10,14 @@ from customer_segmentation_assistant.comparison_request import (
 
 
 def test_complete_scope_preserves_zero_threshold():
-    result = parse_comparison_request(json.dumps({
-        "contracts": ["Month-to-month", "One year"],
-        "minimum_churn_probability": 0.0,
-    }))
+    result = parse_comparison_request(
+        json.dumps(
+            {
+                "contracts": ["Month-to-month", "One year"],
+                "minimum_churn_probability": 0.0,
+            }
+        )
+    )
 
     assert result == {
         "kind": "comparison",
@@ -52,10 +56,14 @@ def test_missing_criteria_produce_clarification(
     threshold,
     question,
 ):
-    result = parse_comparison_request(json.dumps({
-        "contracts": contracts,
-        "minimum_churn_probability": threshold,
-    }))
+    result = parse_comparison_request(
+        json.dumps(
+            {
+                "contracts": contracts,
+                "minimum_churn_probability": threshold,
+            }
+        )
+    )
 
     assert result == {"kind": "clarification", "question": question}
 
@@ -68,29 +76,25 @@ def test_missing_criteria_produce_clarification(
         '{"contracts":"One year","minimum_churn_probability":0.7}',
         '{"contracts":["Other"],"minimum_churn_probability":0.7}',
         '{"contracts":[[]],"minimum_churn_probability":0.7}',
-        (
-            '{"contracts":["One year","One year"],'
-            '"minimum_churn_probability":0.7}'
-        ),
-        (
-            '{"contracts":["One year","Two year"],'
-            '"minimum_churn_probability":70}'
-        ),
-        (
-            '{"contracts":["One year","Two year"],'
-            '"minimum_churn_probability":true}'
-        ),
+        ('{"contracts":["One year","One year"],"minimum_churn_probability":0.7}'),
+        ('{"contracts":["One year","Two year"],"minimum_churn_probability":70}'),
+        ('{"contracts":["One year","Two year"],"minimum_churn_probability":true}'),
     ],
 )
 def test_rejects_invalid_scope(raw):
     with pytest.raises(ValueError):
         parse_comparison_request(raw)
 
+
 def test_unsupported_requirement_is_preserved():
-    result = parse_comparison_request(json.dumps({
-        "kind": "unsupported",
-        "message": "Tenure filters are not supported.",
-    }))
+    result = parse_comparison_request(
+        json.dumps(
+            {
+                "kind": "unsupported",
+                "message": "Tenure filters are not supported.",
+            }
+        )
+    )
 
     assert result == {
         "kind": "unsupported",
@@ -118,22 +122,35 @@ def test_unsupported_follow_up_blocks_later_execution():
 
     conversation = ComparisonConversation()
 
-    assert conversation.update({
-        "contracts": ["Month-to-month", "One year"],
-        "minimum_churn_probability": None,
-    })["kind"] == "clarification"
+    assert (
+        conversation.update(
+            {
+                "contracts": ["Month-to-month", "One year"],
+                "minimum_churn_probability": None,
+            }
+        )["kind"]
+        == "clarification"
+    )
 
-    rejected = conversation.update({
-        "kind": "unsupported",
-        "message": "Tenure filters are not supported.",
-    })
+    rejected = conversation.update(
+        {
+            "kind": "unsupported",
+            "message": "Tenure filters are not supported.",
+        }
+    )
 
     assert rejected["kind"] == "unsupported"
 
-    assert conversation.update({
-        "contracts": [],
-        "minimum_churn_probability": 0.6,
-    }) == rejected
+    assert (
+        conversation.update(
+            {
+                "contracts": [],
+                "minimum_churn_probability": 0.6,
+            }
+        )
+        == rejected
+    )
+
 
 @pytest.mark.parametrize(
     ("probabilities", "requirements"),
@@ -150,11 +167,15 @@ def test_extracted_requirements_block_incomplete_comparison(
         normalize_comparison_extraction,
     )
 
-    result = normalize_comparison_extraction(json.dumps({
-        "contracts": ["Month-to-month", "One year"],
-        "minimum_probabilities": probabilities,
-        "unsupported_requirements": requirements,
-    }))
+    result = normalize_comparison_extraction(
+        json.dumps(
+            {
+                "contracts": ["Month-to-month", "One year"],
+                "minimum_probabilities": probabilities,
+                "unsupported_requirements": requirements,
+            }
+        )
+    )
 
     assert result["kind"] == "unsupported"
 
@@ -164,13 +185,38 @@ def test_same_threshold_for_both_contracts_is_supported():
         normalize_comparison_extraction,
     )
 
-    result = normalize_comparison_extraction(json.dumps({
-        "contracts": ["Month-to-month", "One year"],
-        "minimum_probabilities": [0.6, 0.6],
-        "unsupported_requirements": [],
-    }))
+    result = normalize_comparison_extraction(
+        json.dumps(
+            {
+                "contracts": ["Month-to-month", "One year"],
+                "minimum_probabilities": [0.6, 0.6],
+                "unsupported_requirements": [],
+            }
+        )
+    )
 
     assert result == {
         "contracts": ["Month-to-month", "One year"],
         "minimum_churn_probability": 0.6,
+    }
+
+
+def test_equivalent_thresholds_are_normalized():
+    from customer_segmentation_assistant.comparison_request import (
+        normalize_comparison_extraction,
+    )
+
+    result = normalize_comparison_extraction(
+        json.dumps(
+            {
+                "contracts": ["Month-to-month", "One year"],
+                "minimum_probabilities": [0.7, 0.7000000000000001],
+                "unsupported_requirements": [],
+            }
+        )
+    )
+
+    assert result == {
+        "contracts": ["Month-to-month", "One year"],
+        "minimum_churn_probability": 0.7,
     }
