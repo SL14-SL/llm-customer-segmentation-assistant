@@ -5,14 +5,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
 
-from customer_segmentation_assistant.tool_llm import generate_tool_decision
+from customer_segmentation_assistant.segments.extraction import generate_tool_decision
 
 
 def main() -> int:
     """Check decision types and arguments, flagging clarification review."""
-    cases = json.loads(
-        Path("evaluation/tool_cases.json").read_text(encoding="utf-8")
-    )
+    cases = json.loads(Path("evaluation/tool_cases.json").read_text(encoding="utf-8"))
     results = []
 
     for case in cases:

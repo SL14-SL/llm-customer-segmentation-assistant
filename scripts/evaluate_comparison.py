@@ -8,18 +8,18 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from time import perf_counter
 
-from customer_segmentation_assistant.agent import (
+from customer_segmentation_assistant.comparison.agent import (
     propose_next_action,
     run_comparison,
 )
-from customer_segmentation_assistant.comparison_conversation import (
+from customer_segmentation_assistant.comparison.conversation import (
     ComparisonConversation,
 )
-from customer_segmentation_assistant.comparison_request import (
+from customer_segmentation_assistant.comparison.request import (
     extract_comparison_follow_up,
 )
 from customer_segmentation_assistant.config import DEFAULT_MODEL
-from customer_segmentation_assistant.demo_data import create_demo_database
+from customer_segmentation_assistant.demo.comparison import create_demo_database
 
 
 def require(condition: bool, message: str) -> None:

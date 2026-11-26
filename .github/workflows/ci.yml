@@ -59,7 +59,7 @@ jobs:
           docker run -d --name sql-demo -p 127.0.0.1:8502:8502 \
             -e CUSTOMER_DATABASE=/app/data/text_sql_demo.duckdb \
             -e SYNTHETIC_DEMO=1 customer-sql-demo sh -c \
-            'python -m customer_segmentation_assistant.text_sql_demo && exec streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=8502 --server.headless=true'
+            'python -m customer_segmentation_assistant.demo.text_to_sql && exec streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=8502 --server.headless=true'
           for attempt in $(seq 1 30); do
             if curl --fail --silent http://localhost:8502/_stcore/health; then
               exit 0
@@ -71,7 +71,7 @@ jobs:
       - name: Verify demo data in container
         run: >-
           docker exec sql-demo python -c
-          "from customer_segmentation_assistant.database import query_dataframe;
+          "from customer_segmentation_assistant.storage.database import query_dataframe;
           assert query_dataframe('SELECT COUNT(*) FROM customers').iloc[0, 0] == 300"
       - name: Container logs
         if: always()

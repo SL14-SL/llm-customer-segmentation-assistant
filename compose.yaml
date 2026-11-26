@@ -45,7 +45,7 @@ services:
       - /bin/sh
       - -c
       - >-
-        python -m customer_segmentation_assistant.text_sql_demo
+        python -m customer_segmentation_assistant.demo.text_to_sql
         --database "$$CUSTOMER_DATABASE" &&
         exec streamlit run streamlit_app.py --server.address=0.0.0.0
         --server.port=8502 --server.headless=true

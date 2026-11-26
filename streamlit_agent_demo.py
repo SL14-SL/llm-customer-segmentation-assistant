@@ -5,18 +5,18 @@ from pathlib import Path
 
 import streamlit as st
 
-from customer_segmentation_assistant.agent import (
+from customer_segmentation_assistant.comparison.agent import (
     propose_next_action,
     run_comparison,
 )
-from customer_segmentation_assistant.comparison_conversation import (
+from customer_segmentation_assistant.comparison.conversation import (
     ComparisonConversation,
 )
-from customer_segmentation_assistant.comparison_request import (
+from customer_segmentation_assistant.comparison.request import (
     extract_comparison_follow_up,
 )
-from customer_segmentation_assistant.demo_data import create_demo_database
-from customer_segmentation_assistant.ui_theme import apply_ui_theme
+from customer_segmentation_assistant.demo.comparison import create_demo_database
+from customer_segmentation_assistant.ui.theme import apply_ui_theme
 
 DATABASE = Path("data/agent_demo.duckdb")
 
