@@ -1,10 +1,15 @@
 """Ask customer segmentation questions from the terminal."""
 
 import argparse
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
 from customer_segmentation_assistant.config import DEFAULT_MODEL
+from customer_segmentation_assistant.llm.error_messages import (
+    format_ollama_error,
+)
+from customer_segmentation_assistant.llm.exceptions import OllamaError
 from customer_segmentation_assistant.storage.database import query_dataframe
 from customer_segmentation_assistant.storage.export import export_csv
 from customer_segmentation_assistant.text_to_sql.assistant import generate_decision
@@ -66,11 +71,18 @@ def main() -> None:
             if entry.startswith(("Original customer question: ", "Customer answer: "))
         ]
 
-        decision = generate_decision(
-            current_request,
-            model=args.model,
-            customer_messages=customer_messages,
-        )
+        try:
+            decision = generate_decision(
+                current_request,
+                model=args.model,
+                customer_messages=customer_messages,
+            )
+        except OllamaError as error:
+            print(
+                f"\nError: {format_ollama_error(error)}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from None
 
         if isinstance(decision, UnsupportedDecision):
             print(f"\nNot supported: {decision.message}")

@@ -7,12 +7,16 @@ from urllib.error import URLError
 
 import duckdb
 import streamlit as st
+
+from customer_segmentation_assistant.config import DEFAULT_MODEL
+from customer_segmentation_assistant.llm.error_messages import (
+    format_ollama_error,
+)
+from customer_segmentation_assistant.llm.exceptions import OllamaError
 from customer_segmentation_assistant.storage.database import (
     DEFAULT_DATABASE,
     query_dataframe,
 )
-
-from customer_segmentation_assistant.config import DEFAULT_MODEL
 from customer_segmentation_assistant.text_to_sql.assistant import generate_decision
 from customer_segmentation_assistant.text_to_sql.decisions import (
     ClarificationDecision,
@@ -255,6 +259,12 @@ if question and question.strip():
     try:
         with st.spinner("Preparing your answer with the local model..."):
             answer = process_question(question)
+
+    except OllamaError as error:
+        answer = {
+            "role": "assistant",
+            "content": format_ollama_error(error),
+        }
 
     except (
         URLError,
