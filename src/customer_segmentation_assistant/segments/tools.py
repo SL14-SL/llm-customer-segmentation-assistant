@@ -1,19 +1,14 @@
 """Read-only analytical tools with validated arguments."""
 
-import math
 from pathlib import Path
 
+from customer_segmentation_assistant.segments.criteria import (
+    is_supported_contract,
+    validate_probability,
+)
 from customer_segmentation_assistant.storage.database import (
     DEFAULT_DATABASE,
     query_dataframe,
-)
-
-CONTRACT_TYPES = frozenset(
-    {
-        "Month-to-month",
-        "One year",
-        "Two year",
-    }
 )
 
 
@@ -24,20 +19,15 @@ def summarize_segment(
     database: Path = DEFAULT_DATABASE,
 ) -> dict[str, int | float | str | None]:
     """Summarize customers matching a contract and inclusive risk threshold."""
-    if not isinstance(contract, str) or contract not in CONTRACT_TYPES:
+    if not is_supported_contract(contract):
         raise ValueError("Unsupported contract type.")
 
-    if (
-        isinstance(minimum_churn_probability, bool)
-        or not isinstance(minimum_churn_probability, (int, float))
-        or not math.isfinite(minimum_churn_probability)
-        or not 0 <= minimum_churn_probability <= 1
-    ):
-        raise ValueError(
+    threshold = validate_probability(
+        minimum_churn_probability,
+        error_message=(
             "minimum_churn_probability must be a finite number from 0 to 1."
-        )
-
-    threshold = float(minimum_churn_probability)
+        ),
+    )
 
     result = query_dataframe(
         """
@@ -52,6 +42,7 @@ def summarize_segment(
         [contract, threshold],
         database=database,
     )
+
     row = result.iloc[0]
     count = int(row["customer_count"])
 

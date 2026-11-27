@@ -1,10 +1,10 @@
 [project]
 name = "customer-segmentation-assistant"
 version = "0.1.0"
-description = "Add your description here"
+description = "Local LLM-powered customer analytics with validated Text-to-SQL and bounded segment comparison."
 readme = "README.md"
 authors = [
-    { name = "Steffen Lau", email = "steffen.datascience@gmail.com" }
+    { name = "Steffen Lauterbach", email = "slauterbach@mlengineering@gmail.com" }
 ]
 requires-python = ">=3.12.9"
 dependencies = [

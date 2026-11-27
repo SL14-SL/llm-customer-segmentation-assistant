@@ -1,11 +1,12 @@
 """Extract segment criteria and determine the next action in Python."""
 
 import json
-import math
 
 from customer_segmentation_assistant.config import DEFAULT_MODEL
 from customer_segmentation_assistant.llm.client import generate_structured_response
-from customer_segmentation_assistant.segments.tools import CONTRACT_TYPES
+from customer_segmentation_assistant.segments.criteria import (
+    parse_segment_criteria,
+)
 
 CRITERIA_SCHEMA = {
     "type": "object",
@@ -54,47 +55,6 @@ Never supply a default contract or risk threshold.
 Use JSON null for missing criteria, not the string "null".
 Do not ask questions, generate SQL, calculate metrics or execute tools.
 """
-
-
-def parse_segment_criteria(raw: str) -> dict[str, object]:
-    """Validate extracted criteria without accessing customer data."""
-    try:
-        criteria = json.loads(raw)
-    except json.JSONDecodeError as error:
-        raise ValueError("Criteria must be valid JSON.") from error
-
-    if not isinstance(criteria, dict):
-        raise ValueError(  # noqa: TRY004
-            "Criteria must be a JSON object."
-        )
-
-    if set(criteria) != {"contract", "minimum_churn_probability"}:
-        raise ValueError("Unexpected or missing criteria fields.")
-
-    contract = criteria["contract"]
-
-    if contract is not None and (
-        not isinstance(contract, str) or contract not in CONTRACT_TYPES
-    ):
-        raise ValueError("Unsupported contract type.")
-
-    threshold = criteria["minimum_churn_probability"]
-
-    if threshold is not None:
-        if (
-            isinstance(threshold, bool)
-            or not isinstance(threshold, (int, float))
-            or not math.isfinite(threshold)
-            or not 0 <= threshold <= 1
-        ):
-            raise ValueError("Minimum probability must be a finite number from 0 to 1.")
-
-        threshold = round(float(threshold), 12)
-
-    return {
-        "contract": contract,
-        "minimum_churn_probability": threshold,
-    }
 
 
 def parse_tool_decision(raw: str) -> dict[str, object]:

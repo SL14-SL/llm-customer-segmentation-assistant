@@ -7,96 +7,10 @@ from customer_segmentation_assistant.comparison.scope import (
 )
 from customer_segmentation_assistant.config import DEFAULT_MODEL
 from customer_segmentation_assistant.llm.client import generate_structured_response
-from customer_segmentation_assistant.segments.extraction import parse_segment_criteria
-from customer_segmentation_assistant.segments.tools import CONTRACT_TYPES
-
-COMPARISON_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "contracts": {
-            "type": "array",
-            "items": {
-                "enum": ["Month-to-month", "One year", "Two year"],
-            },
-            "maxItems": 3,
-            "uniqueItems": True,
-        },
-        "minimum_churn_probability": {
-            "type": ["number", "null"],
-            "minimum": 0,
-            "maximum": 1,
-        },
-    },
-    "required": ["contracts", "minimum_churn_probability"],
-    "additionalProperties": False,
-}
-
-COMPARISON_SCHEMA = {
-    "anyOf": [
-        COMPARISON_SCHEMA,
-        {
-            "type": "object",
-            "properties": {
-                "kind": {"type": "string", "enum": ["unsupported"]},
-                "message": {"type": "string", "minLength": 1},
-            },
-            "required": ["kind", "message"],
-            "additionalProperties": False,
-        },
-    ],
-}
-
-COMPARISON_PROMPT = """
-Interpret a request for a narrowly scoped customer comparison.
-
-The ONLY supported inputs are:
-- Contract types: Month-to-month, One year, Two year.
-- ONE shared inclusive minimum predicted churn probability.
-
-The ONLY supported results are:
-- Matching customer count.
-- Average monthly charges.
-- Average predicted churn probability.
-
-If ANY requested condition, action or result is outside these capabilities,
-return an object with kind "unsupported" and a message naming
-the specific unsupported requirement in the user's request.
-Do not use a generic explanation or copy instructions as the message.
-
-Never silently discard a requirement.
-Unsupported requests include:
-- Filters on tenure, monthly charges, age or other customer attributes.
-- Different probability thresholds for different contracts.
-- Maximum, exclusive or range probability conditions.
-- Observed churn outcomes, historical analysis or individual customer lists.
-- Updating data or contacting customers.
-
-Otherwise return:
-{"contracts":[...],"minimum_churn_probability":...}
-
-Contract mappings:
-- monthly or month-to-month: "Month-to-month"
-- annual, yearly or one-year: "One year"
-- two-year: "Two year"
-
-Include only explicitly requested contract types.
-Do not add contracts or repeat them.
-Use [] when no contract types are supplied.
-
-Extract an explicitly supplied inclusive minimum predicted churn probability.
-"At least", "minimum" and "or higher" specify an inclusive minimum.
-Convert percentages to probabilities.
-0% is 0.0, not missing information.
-Use null if no numerical minimum is supplied.
-"High risk" alone does not specify a threshold.
-Missing supported criteria require clarification, not rejection.
-
-A follow-up answer supplying only a probability is valid.
-Numbers describing tenure or other attributes are NOT probabilities.
-
-Do not execute tools, calculate results or ask clarification questions.
-Return only the JSON object.
-"""
+from customer_segmentation_assistant.segments.criteria import (
+    is_supported_contract,
+    normalize_probability,
+)
 
 
 def parse_comparison_request(raw: str) -> dict[str, object]:
@@ -110,6 +24,7 @@ def parse_comparison_request(raw: str) -> dict[str, object]:
         raise ValueError(  # noqa: TRY004
             "Comparison criteria must be a JSON object."
         )
+
     if criteria.get("kind") == "unsupported":
         message = criteria.get("message")
 
@@ -124,6 +39,7 @@ def parse_comparison_request(raw: str) -> dict[str, object]:
             "kind": "unsupported",
             "message": message.strip(),
         }
+
     if set(criteria) != {"contracts", "minimum_churn_probability"}:
         raise ValueError("Unexpected or missing comparison fields.")
 
@@ -134,24 +50,16 @@ def parse_comparison_request(raw: str) -> dict[str, object]:
             "Contracts must be a list."
         )
 
-    if any(
-        not isinstance(contract, str) or contract not in CONTRACT_TYPES
-        for contract in contracts
-    ):
+    if any(not is_supported_contract(contract) for contract in contracts):
         raise ValueError("Unsupported comparison contract.")
 
     if len(set(contracts)) != len(contracts):
         raise ValueError("Comparison contracts must be distinct.")
 
-    validated = parse_segment_criteria(
-        json.dumps(
-            {
-                "contract": None,
-                "minimum_churn_probability": criteria["minimum_churn_probability"],
-            }
-        )
-    )
-    threshold = validated["minimum_churn_probability"]
+    threshold = criteria["minimum_churn_probability"]
+
+    if threshold is not None:
+        threshold = normalize_probability(threshold)
 
     if len(contracts) < 2 and threshold is None:
         question = (
@@ -293,21 +201,10 @@ def normalize_comparison_extraction(raw: str) -> dict[str, object]:
     normalized_probabilities = []
 
     for probability in probabilities:
-        validated = parse_segment_criteria(
-            json.dumps(
-                {
-                    "contract": None,
-                    "minimum_churn_probability": probability,
-                }
-            )
-        )
-
-        threshold = validated["minimum_churn_probability"]
-
-        if threshold is None:
+        if probability is None:
             raise ValueError("Extracted probabilities cannot be null.")
 
-        normalized_probabilities.append(threshold)
+        normalized_probabilities.append(normalize_probability(probability))
 
     problems = [item.strip() for item in requirements]
 
@@ -357,16 +254,6 @@ def extract_comparison_criteria(
     parse_comparison_request(json.dumps(criteria))
 
     return criteria
-
-
-def generate_comparison_request(
-    question: str,
-    *,
-    model: str = DEFAULT_MODEL,
-) -> dict[str, object]:
-    """Extract comparison criteria and determine the next action."""
-    criteria = extract_comparison_criteria(question, model=model)
-    return parse_comparison_request(json.dumps(criteria))
 
 
 def extract_comparison_follow_up(

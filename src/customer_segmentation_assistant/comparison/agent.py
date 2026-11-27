@@ -1,14 +1,16 @@
 """Run a bounded segment-comparison agent with visible tool results."""
 
 import json
-import math
 from collections.abc import Callable
 from pathlib import Path
 
 from customer_segmentation_assistant.config import DEFAULT_MODEL
 from customer_segmentation_assistant.llm.client import generate_structured_response
+from customer_segmentation_assistant.segments.criteria import (
+    is_supported_contract,
+    validate_probability,
+)
 from customer_segmentation_assistant.segments.dispatch import execute_tool_call
-from customer_segmentation_assistant.segments.tools import CONTRACT_TYPES
 
 AGENT_PROMPT = """
 Select the next action for a bounded customer-segment comparison.
@@ -124,21 +126,15 @@ def run_comparison(
     """Execute permitted actions until completion or a limit violation."""
     if (
         len(contracts) < 2
-        or any(
-            not isinstance(contract, str) or contract not in CONTRACT_TYPES
-            for contract in contracts
-        )
+        or any(not is_supported_contract(contract) for contract in contracts)
         or len(set(contracts)) != len(contracts)
     ):
         raise ValueError("Supply at least two distinct supported contracts.")
 
-    if (
-        isinstance(minimum_churn_probability, bool)
-        or not isinstance(minimum_churn_probability, (int, float))
-        or not math.isfinite(minimum_churn_probability)
-        or not 0 <= minimum_churn_probability <= 1
-    ):
-        raise ValueError("Probability threshold must be from 0 to 1.")
+    threshold = validate_probability(
+        minimum_churn_probability,
+        error_message="Probability threshold must be from 0 to 1.",
+    )
 
     if (
         isinstance(max_tool_calls, bool)
@@ -147,7 +143,6 @@ def run_comparison(
     ):
         raise ValueError("max_tool_calls must be a positive integer.")
 
-    threshold = float(minimum_churn_probability)
     observations = []
     completed = set()
 

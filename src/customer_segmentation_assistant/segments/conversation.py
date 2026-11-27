@@ -3,8 +3,10 @@
 import json
 from dataclasses import dataclass, field
 
-from customer_segmentation_assistant.segments.extraction import (
+from customer_segmentation_assistant.segments.criteria import (
     parse_segment_criteria,
+)
+from customer_segmentation_assistant.segments.extraction import (
     parse_tool_decision,
 )
 
