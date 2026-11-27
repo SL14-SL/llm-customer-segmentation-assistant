@@ -1,6 +1,6 @@
 [project]
 name = "customer-segmentation-assistant"
-version = "0.1.0"
+version = "0.2.0"
 description = "Local LLM-powered customer analytics with validated Text-to-SQL and bounded segment comparison."
 readme = "README.md"
 authors = [
