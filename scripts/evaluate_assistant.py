@@ -7,12 +7,12 @@ from time import perf_counter
 
 from pandas.testing import assert_frame_equal
 
-from customer_segmentation_assistant.database import query_dataframe
-from customer_segmentation_assistant.decisions import (
+from customer_segmentation_assistant.storage.database import query_dataframe
+from customer_segmentation_assistant.text_to_sql.assistant import generate_decision
+from customer_segmentation_assistant.text_to_sql.decisions import (
     ClarificationDecision,
     QueryDecision,
 )
-from customer_segmentation_assistant.llm import generate_decision
 
 
 def main() -> None:

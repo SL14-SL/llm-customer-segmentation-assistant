@@ -37,6 +37,7 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5-coder:3b}
+      OLLAMA_TIMEOUT_SECONDS: "${OLLAMA_TIMEOUT_SECONDS:-180}"
       CUSTOMER_DATABASE: /app/data/text_sql_demo.duckdb
       SYNTHETIC_DEMO: "1"
     volumes:
@@ -45,7 +46,7 @@ services:
       - /bin/sh
       - -c
       - >-
-        python -m customer_segmentation_assistant.text_sql_demo
+        python -m customer_segmentation_assistant.demo.text_to_sql
         --database "$$CUSTOMER_DATABASE" &&
         exec streamlit run streamlit_app.py --server.address=0.0.0.0
         --server.port=8502 --server.headless=true
@@ -66,6 +67,7 @@ services:
     environment:
       OLLAMA_BASE_URL: http://ollama:11434
       OLLAMA_MODEL: ${COMPARISON_OLLAMA_MODEL:-qwen2.5:14b}
+      OLLAMA_TIMEOUT_SECONDS: "${OLLAMA_TIMEOUT_SECONDS:-180}"
     volumes:
       - comparison_data:/app/data
     command:

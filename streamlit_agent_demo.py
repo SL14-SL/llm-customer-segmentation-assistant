@@ -5,18 +5,22 @@ from pathlib import Path
 
 import streamlit as st
 
-from customer_segmentation_assistant.agent import (
+from customer_segmentation_assistant.comparison.agent import (
     propose_next_action,
     run_comparison,
 )
-from customer_segmentation_assistant.comparison_conversation import (
+from customer_segmentation_assistant.comparison.conversation import (
     ComparisonConversation,
 )
-from customer_segmentation_assistant.comparison_request import (
+from customer_segmentation_assistant.comparison.request import (
     extract_comparison_follow_up,
 )
-from customer_segmentation_assistant.demo_data import create_demo_database
-from customer_segmentation_assistant.ui_theme import apply_ui_theme
+from customer_segmentation_assistant.demo.comparison import create_demo_database
+from customer_segmentation_assistant.llm.error_messages import (
+    format_ollama_error,
+)
+from customer_segmentation_assistant.llm.exceptions import OllamaError
+from customer_segmentation_assistant.ui.theme import apply_ui_theme
 
 DATABASE = Path("data/agent_demo.duckdb")
 
@@ -126,8 +130,12 @@ def main() -> None:
 
                 st.session_state["result"] = result
 
+            except OllamaError as error:
+                st.error(f"Comparison stopped: {format_ollama_error(error)}")
+
             except Exception as error:  # noqa: BLE001 - display execution errors in UI
                 st.error(f"Comparison stopped: {type(error).__name__}: {error}")
+
             finally:
                 st.session_state["actions"] = actions
 
@@ -199,7 +207,12 @@ def main() -> None:
             else:
                 raise ValueError("Unknown comparison decision.")
 
+        except OllamaError as error:
+            st.session_state["decision"] = None
+            reply = format_ollama_error(error)
+
         except Exception as error:  # noqa: BLE001 - display request errors in UI
+            st.session_state["decision"] = None
             reply = (
                 f"Could not interpret this request: {type(error).__name__}. "
                 "Try rephrasing it or start a new comparison."

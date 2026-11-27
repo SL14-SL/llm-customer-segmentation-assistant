@@ -4,10 +4,10 @@ on:
   push:
     branches:
       - main
-      - feat/segment-summary-tool
   pull_request:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   quality:
-    name: Lint and unit tests
+    name: Lint and tests
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -41,38 +41,80 @@ jobs:
           src tests scripts
           streamlit_app.py streamlit_agent_demo.py
 
-      - name: Run unit tests
+      - name: Run all tests
         run: uv run --no-sync pytest -q
+
   container:
-    name: Container demo smoke test
+    name: Container smoke test (${{ matrix.demo }})
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - demo: text-to-sql
+            port: 8502
+          - demo: comparison
+            port: 8503
+
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
       - name: Validate Compose configuration
         run: docker compose config --quiet
+
       - name: Build application
-        run: docker build -t customer-sql-demo .
-      - name: Start synthetic demo without model inference
+        run: docker build -t customer-analytics-demo .
+
+      - name: Start Text-to-SQL demo
+        if: matrix.demo == 'text-to-sql'
         run: |
-          docker run -d --name sql-demo -p 127.0.0.1:8502:8502 \
+          docker run -d --name app-demo \
+            -p 127.0.0.1:8502:8502 \
             -e CUSTOMER_DATABASE=/app/data/text_sql_demo.duckdb \
-            -e SYNTHETIC_DEMO=1 customer-sql-demo sh -c \
-            'python -m customer_segmentation_assistant.text_sql_demo && exec streamlit run streamlit_app.py --server.address=0.0.0.0 --server.port=8502 --server.headless=true'
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent http://localhost:8502/_stcore/health; then
-              exit 0
-            fi
-            sleep 2
-          done
-          docker logs sql-demo
-          exit 1
-      - name: Verify demo data in container
-        run: >-
-          docker exec sql-demo python -c
-          "from customer_segmentation_assistant.database import query_dataframe;
-          assert query_dataframe('SELECT COUNT(*) FROM customers').iloc[0, 0] == 300"
+            -e SYNTHETIC_DEMO=1 \
+            customer-analytics-demo sh -c \
+            'python -m customer_segmentation_assistant.demo.text_to_sql &&
+             exec streamlit run streamlit_app.py \
+               --server.address=0.0.0.0 \
+               --server.port=8502 \
+               --server.headless=true'
+
+      - name: Start comparison demo
+        if: matrix.demo == 'comparison'
+        run: |
+          docker run -d --name app-demo \
+            -p 127.0.0.1:8503:8503 \
+            customer-analytics-demo \
+            streamlit run streamlit_agent_demo.py \
+            --server.address=0.0.0.0 \
+            --server.port=8503 \
+            --server.headless=true
+
+      - name: Wait for application health
+        env:
+          APP_PORT: ${{ matrix.port }}
+        run: bash scripts/smoke/wait_for_health.sh "$APP_PORT"
+
+      - name: Verify Text-to-SQL demo data
+        if: matrix.demo == 'text-to-sql'
+        run: |
+          docker exec -i app-demo python - \
+            < scripts/smoke/verify_text_to_sql.py
+
+      - name: Verify comparison tools and computed report
+        if: matrix.demo == 'comparison'
+        run: |
+          docker exec -i app-demo python - \
+            --database /app/data/smoke_comparison.duckdb \
+            < scripts/smoke/verify_comparison.py
+
       - name: Container logs
         if: always()
-        run: docker logs sql-demo || true
+        run: docker logs app-demo || true
+
+      - name: Remove container
+        if: always()
+        run: docker rm -f app-demo || true

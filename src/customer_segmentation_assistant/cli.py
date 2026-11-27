@@ -1,15 +1,22 @@
 """Ask customer segmentation questions from the terminal."""
+
 import argparse
+import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-from customer_segmentation_assistant.database import query_dataframe
-from customer_segmentation_assistant.decisions import (
+from customer_segmentation_assistant.config import DEFAULT_MODEL
+from customer_segmentation_assistant.llm.error_messages import (
+    format_ollama_error,
+)
+from customer_segmentation_assistant.llm.exceptions import OllamaError
+from customer_segmentation_assistant.storage.database import query_dataframe
+from customer_segmentation_assistant.storage.export import export_csv
+from customer_segmentation_assistant.text_to_sql.assistant import generate_decision
+from customer_segmentation_assistant.text_to_sql.decisions import (
     ClarificationDecision,
     UnsupportedDecision,
 )
-from customer_segmentation_assistant.export import export_csv
-from customer_segmentation_assistant.llm import DEFAULT_MODEL, generate_decision
 
 MAX_CLARIFICATIONS = 3
 
@@ -61,21 +68,26 @@ def main() -> None:
                 "Customer answer: "
             )
             for entry in context
-            if entry.startswith(
-                ("Original customer question: ", "Customer answer: ")
-            )
+            if entry.startswith(("Original customer question: ", "Customer answer: "))
         ]
 
-        decision = generate_decision(
-            current_request,
-            model=args.model,
-            customer_messages=customer_messages,
-        )
+        try:
+            decision = generate_decision(
+                current_request,
+                model=args.model,
+                customer_messages=customer_messages,
+            )
+        except OllamaError as error:
+            print(
+                f"\nError: {format_ollama_error(error)}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1) from None
 
         if isinstance(decision, UnsupportedDecision):
             print(f"\nNot supported: {decision.message}")
             return
-        
+
         if not isinstance(decision, ClarificationDecision):
             print(f"\nSQL:\n{decision.sql}")
             result = query_dataframe(decision.sql)
@@ -104,10 +116,12 @@ def main() -> None:
             print("Cancelled.")
             return
 
-        context.extend([
-            f"Assistant clarification: {decision.question}",
-            f"Customer answer: {answer}",
-        ])
+        context.extend(
+            [
+                f"Assistant clarification: {decision.question}",
+                f"Customer answer: {answer}",
+            ]
+        )
 
 
 if __name__ == "__main__":

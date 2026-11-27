@@ -3,10 +3,10 @@
 import json
 from math import isclose
 
-from customer_segmentation_assistant.comparison_conversation import (
+from customer_segmentation_assistant.comparison.conversation import (
     ComparisonConversation,
 )
-from customer_segmentation_assistant.comparison_request import (
+from customer_segmentation_assistant.comparison.request import (
     extract_comparison_follow_up,
 )
 
