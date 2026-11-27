@@ -11,41 +11,47 @@ Automated tests verify deterministic behavior. Live-model
 evaluations additionally exercise natural-language interpretation
 with a running Ollama model.
 
-### Evaluation overview
+### Validation results
 
-Historical pre-refactoring results recorded on 2026-11-26 (not a new evaluation of the refactored code):
+Latest validation: 2026-11-27.
 
 | Validation | Model | Result |
 | --- | --- | --- |
-| Automated tests | Not required | 179 passed |
+| Automated test suite | Not required | 296 passed |
+| Streamlit integration tests (included above) | Not required | 18/18 |
 | Ruff linting | Not required | Passed |
-| Text-to-SQL reference evaluation | `qwen2.5-coder:3b` | 8/9 cases; failed case passed on targeted rerun |
-| Single-segment tool-decision evaluation | `qwen2.5-coder:3b` | 7/7 automatic checks |
+| Docker Compose validation | Not required | Passed |
+| Text-to-SQL reference evaluation | `qwen2.5-coder:3b` | 9/9 |
+| Single-segment tool-decision evaluation | `qwen2.5-coder:3b` | 7/7 |
 | Comparison clarification check | `qwen2.5:14b` | Passed |
-| Comparison end-to-end evaluation | `qwen2.5:14b` | 8/8 cases |
-| Docker startup and health checks | Both default models | Passed |
-| Docker Text-to-SQL functional smoke test | `qwen2.5-coder:3b` | Passed |
-| Docker comparison criteria and clarification | `qwen2.5:14b` | Passed |
+| Comparison end-to-end evaluation | `qwen2.5:14b` | 8/8 |
+| Docker image builds and health checks | Not required | Passed |
+| Docker environment configuration | Not required | Verified |
+| Deterministic smoke tests | Not required | Passed |
+| Docker Text-to-SQL functional verification | `qwen2.5-coder:3b` | Passed |
+| Docker comparison clarification and execution | `qwen2.5:14b` | Passed |
 | Docker deterministic scope rejection | Not required | Passed |
+
+The automated test suite covers configuration, model communication,
+structured response validation, error handling, SQL policy enforcement,
+conversation state, criteria validation and controlled tool execution.
+
+The 18 Streamlit integration tests consist of seven Text-to-SQL
+tests and eleven comparison tests. They simulate model responses
+while exercising real conversation logic, validation and
+synthetic DuckDB queries.
+
+Automated tests and deterministic smoke tests do not require
+a running language model.
+
+Live-model evaluations verify natural-language interpretation
+and execution against defined reference cases.
 
 The evaluation suites are small development reference suites,
 not independent general-accuracy benchmarks.
 
-Results depend on the selected model and implementation version.
-
-### Refactoring verification (2026-11-27)
-
-| Check | Result |
-| --- | --- |
-| Full local automated suite | 296 passed |
-| Streamlit AppTest integration tests (included above) | 7 Text-to-SQL + 11 comparison passed |
-| Ruff and Compose validation | Passed |
-| Local model-free smoke scripts | Both passed |
-| Shell syntax | Passed |
-| Updated GitHub Actions matrix | Pending execution |
-| Post-refactoring live-model evaluations and full Docker verification | Pending |
-
-The 296 tests include configuration, shared Ollama transport, typed errors, adapter contracts, shared criteria validation and Streamlit regression tests. The UI tests simulate model responses but exercise real conversation logic and synthetic DuckDB queries. They do not require Ollama or browser automation.
+Results depend on the selected model, configuration, dataset
+and implementation version.
 
 ### Automated checks
 
@@ -92,32 +98,20 @@ OLLAMA_MODEL=qwen2.5-coder:3b \
 uv run python scripts/evaluate_assistant.py
 ```
 
-A historical development run passed 9 of 9 reference cases.
+The reference evaluation passed all 9 cases on 2026-11-27
+using `qwen2.5-coder:3b`.
 
-The complete run on 2026-11-26 passed 8 of 9 cases.
-The remaining clarification follow-up case passed after
-improvements to the evaluation script and targeted re-execution.
-
-Run the clarification case independently:
-
-```bash
-OLLAMA_MODEL=qwen2.5-coder:3b \
-uv run python scripts/evaluate_assistant.py \
-  --case high_risk_after_clarification
-```
-
-The targeted result does not constitute a new complete
-9/9 evaluation run.
-
-Covered behaviors include:
-
-- Customer counts.
-- Combined filters.
-- Percentage thresholds.
-- Missing values.
-- Grouped aggregates.
-- Ranked customer lists.
-- Clarification follow-ups.
+| Reference case | Result |
+| --- | --- |
+| Customer count | Passed |
+| High-risk monthly contracts | Passed |
+| Missing total charges | Passed |
+| Average risk by contract | Passed |
+| Undefined risk threshold | Passed |
+| Combined tenure and probability filters | Passed |
+| Retention action distribution | Passed |
+| Highest monthly charges | Passed |
+| High-risk query after clarification | Passed |
 
 Query evaluation compares returned values while ignoring
 output aliases.
@@ -125,8 +119,10 @@ output aliases.
 Row order is checked when required.
 
 Standalone clarification wording requires manual review.
+The clarification response correctly requested the missing
+numerical risk threshold.
 
-Unsupported responses were checked manually and were not
+Unsupported responses are verified separately and are not
 included in these nine reference cases.
 
 ### Single-segment tool-decision evaluation
@@ -136,12 +132,26 @@ OLLAMA_MODEL=qwen2.5-coder:3b \
 uv run python scripts/evaluate_tools.py
 ```
 
-The development run on 2026-11-26 passed 7 of 7 automatic
-checks.
+The evaluation passed all 7 automatic checks on 2026-11-27
+using `qwen2.5-coder:3b`.
 
-Clarification wording was additionally reviewed manually.
+| Reference case | Result |
+| --- | --- |
+| Monthly contracts with 80% threshold | Passed |
+| Two-year contracts with 40% threshold | Passed |
+| Annual contracts with 72% threshold | Passed |
+| Monthly contracts with 0% threshold | Passed |
+| Missing contract and threshold | Passed |
+| Missing threshold only | Passed |
+| Missing contract only | Passed |
 
-These cases evaluate single-segment decisions rather than
+All three clarification responses were additionally reviewed
+manually and correctly requested only the missing criteria.
+
+These cases verify structured criteria extraction,
+probability normalization and deterministic next-action selection.
+
+They evaluate single-segment decisions rather than
 the complete comparison agent.
 
 ### Comparison clarification check
@@ -152,12 +162,20 @@ uv run python scripts/check_comparison_dialogue.py
 ```
 
 This live-model check verifies that a threshold follow-up
-preserves the previously selected contract types.
+preserves previously selected contract types.
 
-The check passed on 2026-11-26 using the recommended
-14B comparison model.
+The check passed on 2026-11-27 using `qwen2.5:14b`.
 
-It requires a running Ollama model.
+The verified dialogue consists of:
+
+1. A request to compare monthly and annual contracts.
+2. Extraction of both contract types without a default threshold.
+3. A clarification question requesting the missing probability.
+4. A follow-up supplying a minimum probability of 70%.
+5. Complete comparison criteria containing both original
+   contract types and the supplied threshold.
+
+The check requires a running Ollama model.
 
 ### Comparison end-to-end evaluation
 
@@ -166,36 +184,53 @@ OLLAMA_MODEL=qwen2.5:14b \
 uv run python scripts/evaluate_comparison.py
 ```
 
-The development run on 2026-11-26 passed all 8 cases
-using `qwen2.5:14b`, including the updated criteria
-extraction and deterministic scope guard.
+The end-to-end evaluation passed all 8 reference cases
+on 2026-11-27 using `qwen2.5:14b`.
 
-A historical run on 2026-11-11 also passed all 8 cases
-with the same model.
+| Reference case | Result |
+| --- | --- |
+| Monthly versus two-year contracts | Passed |
+| All three contract types | Passed |
+| Both segments empty | Passed |
+| Threshold clarification and follow-up | Passed |
+| Unsupported tenure filter | Passed |
+| Unsupported monthly-charge filter | Passed |
+| Different per-segment thresholds | Passed |
+| Unsupported filter in follow-up | Passed |
 
-Covered behaviors include:
+The evaluation verifies:
 
-- Two-contract comparisons.
-- Three-contract comparisons.
-- Empty segments.
-- Threshold clarification.
-- Rejection of unsupported tenure filters.
-- Rejection of unsupported monthly-charge filters.
-- Rejection of different per-segment thresholds.
-- Rejection of additional filters in follow-up messages.
+- Natural-language criteria extraction.
+- Probability threshold validation and normalization.
+- Clarification and conversation state.
+- Deterministic scope validation.
+- Controlled agent execution.
+- Validated tool calls.
+- Correct aggregate calculations.
+- Complete segment coverage.
+- Deterministic report generation.
 
-The smaller `qwen2.5-coder:3b` model produced less reliable
-comparison results during development.
+#### Model selection
 
-Observed failure modes included incomplete contract extraction
-and omitted unsupported requirements.
+The comparison workflow uses `qwen2.5:14b` as its
+recommended model.
 
-For this reason, `qwen2.5:14b` is the default Docker comparison
-model and the recommended model for local comparison evaluation.
+Smaller models, including `qwen2.5-coder:3b`, demonstrated
+less reliable contract extraction and identification of
+unsupported requirements during model evaluation.
 
-The 8/8 result applies to the tested 14B model and reference
-cases. It does not establish equivalent accuracy for smaller
-models or arbitrary user requests.
+The 14B model is therefore the default for the Docker
+comparison application.
+
+The 3B model remains the default for Text-to-SQL
+and single-segment tool-decision evaluation.
+
+Model selection balances interpretation reliability,
+memory requirements and inference time.
+
+The reference results apply to the tested models and cases.
+They do not establish equivalent accuracy for other models
+or arbitrary natural-language requests.
 
 ### Targeted evaluation runs
 
@@ -229,48 +264,114 @@ changes affecting shared prompts or execution logic.
 
 ### Docker verification
 
-Both containerized interfaces were manually tested
-on 2026-11-26.
+Both containerized applications were successfully verified
+on 2026-11-27.
 
-The earlier Docker configuration used the smaller
-`qwen2.5-coder:3b` model for both applications.
+The applications use a shared Ollama server with
+independently configured language models.
 
-The updated configuration was additionally verified with
-separate models:
+| Application | Model |
+| --- | --- |
+| Text-to-SQL | `qwen2.5-coder:3b` |
+| Bounded Segment Comparison | `qwen2.5:14b` |
 
-- Text-to-SQL: `qwen2.5-coder:3b`.
-- Segment Comparison: `qwen2.5:14b`.
+#### Infrastructure verification
 
-Verified behavior includes:
+| Check | Result |
+| --- | --- |
+| Application image builds | Passed |
+| Model initialization | Passed |
+| Ollama health check | Passed |
+| Text-to-SQL health check | Passed |
+| Comparison health check | Passed |
+| Independent model configuration | Verified |
+| Shared Ollama endpoint | Verified |
+| Network timeout configuration | Verified |
+| Persistent model and database volumes | Verified |
+| Shared application theme | Verified |
 
-- Successful initialization of both models.
-- Healthy Ollama server.
-- Healthy Text-to-SQL application.
-- Healthy comparison application.
-- Independent application model configuration.
-- Successful communication with the shared Ollama server.
-- Text-to-SQL query returning the expected 300 customers.
-- Comparison contract extraction and clarification with the 14B model.
-- Correct preservation of the selected contracts.
-- Correct normalization of the probability threshold.
-- Deterministic rejection of unsupported tenure filters.
-- Correct display of unsupported requirements in the comparison interface.
-- Persistent model and database volumes.
-- Shared application theme available inside Docker.
+#### Deterministic smoke tests
 
-The earlier 3B Docker smoke test also verified the complete
-comparison report for monthly and annual contracts with a
-70% minimum churn probability.
+Both reusable smoke scripts were successfully executed
+inside the application containers.
 
-The complete updated comparison workflow with the 14B model
-was verified through the local end-to-end evaluation.
+The Text-to-SQL smoke test verified the expected dataset
+of 300 synthetic customers.
 
-On resource-constrained hardware, concurrent requests to the
-two Docker applications caused timeouts during manual testing.
-Sequential interpretation requests completed successfully.
+The comparison smoke test verified:
 
-These smoke tests verify the exercised workflows.
-They do not replace the complete live-model evaluation.
+- Exactly two completed tool calls.
+- Correct monthly-contract customer count.
+- Correct annual-contract customer count.
+- Inclusion of both contract types in the computed report.
+
+The comparison smoke test uses a deterministic planner
+and an isolated synthetic database.
+
+Neither smoke test requires live model inference.
+
+#### Live Text-to-SQL verification
+
+The containerized application was verified through
+the Streamlit interface using its configured 3B model.
+
+| Scenario | Verified behavior |
+| --- | --- |
+| Customer count | Correct result of 300 customers |
+| Undefined high-risk threshold | Appropriate clarification question |
+| Clarification follow-up | Correct interpretation of a 70% threshold |
+| Ranked customer selection | Five matching customers in descending risk order |
+| Result presentation | Dataframe, SQL inspection and CSV download controls |
+
+#### Live comparison verification
+
+The complete comparison workflow was verified through
+the Streamlit interface using its configured 14B model.
+
+The verified workflow includes:
+
+1. Extraction of monthly and annual contract types.
+2. Clarification of the missing probability threshold.
+3. Interpretation of a shared inclusive minimum of 70%.
+4. Display and explicit confirmation of recognized filters.
+5. Two validated tool calls.
+6. A valid completion action.
+7. Deterministic report generation.
+
+The computed report matched the expected synthetic
+fixture results:
+
+| Contract | Customer count | Average monthly charges | Average predicted churn probability |
+| --- | ---: | ---: | ---: |
+| Month-to-month | 2 | 75.00 | 75% |
+| One year | 1 | 70.00 | 85% |
+
+The interface displayed the model actions, aggregate
+observations, completed tool-call count and computed report.
+
+An additional request containing an unsupported customer
+tenure filter was correctly rejected.
+
+No execution button or computed report was displayed
+for the unsupported request.
+
+#### Resource considerations
+
+Model inference was verified using sequential requests
+to both applications.
+
+Concurrent inference, initial model loading and model
+switching may increase response times, particularly
+on resource-constrained hardware.
+
+The network timeout defaults to 180 seconds and can
+be adjusted through `OLLAMA_TIMEOUT_SECONDS`.
+
+See [System scope and design boundaries](scope.md)
+for additional resource and deployment considerations.
+
+These functional checks complement the automated software
+tests and local live-model reference evaluations.
 
 ### Evaluation methodology and interpretation
 

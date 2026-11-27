@@ -170,23 +170,31 @@ uv run ruff check src tests scripts streamlit_app.py streamlit_agent_demo.py
 uv run pytest -q
 ```
 
-Local refactoring verification (2026-11-27): **296 tests passed**, including
-18 Streamlit regression tests. Both reusable model-free smoke scripts passed.
-The updated GitHub Actions matrix checks both application containers; its first
-execution and post-refactoring live-model validation are still pending.
+Latest validation: 2026-11-27.
 
-Historical live-model reference results (2026-11-26, before refactoring):
-
-| Evaluation | Model | Result |
+| Validation | Model | Result |
 | --- | --- | --- |
-| Text-to-SQL | `qwen2.5-coder:3b` | 8/9; failed case passed on targeted rerun |
+| Automated tests | Not required | 296 passed |
+| Streamlit integration tests (included above) | Not required | 18/18 |
+| Text-to-SQL reference evaluation | `qwen2.5-coder:3b` | 9/9 |
 | Single-segment tool decisions | `qwen2.5-coder:3b` | 7/7 |
 | Comparison clarification | `qwen2.5:14b` | Passed |
 | Comparison end-to-end | `qwen2.5:14b` | 8/8 |
+| Docker build and health checks | Not required | Passed |
+| Docker deterministic smoke tests | Not required | Both passed |
+| Docker functional verification | Both default models | Passed |
+
+Both containerized applications were verified with their configured language
+models, including clarification, SQL execution, controlled tool execution,
+unsupported requirement rejection and computed comparison reporting.
 
 These are small development reference suites, not independent accuracy benchmarks.
-See [Testing, CI and model evaluation](docs/evaluation.md) for commands, historical
-Docker verification and evaluation caveats.
+
+GitHub Actions is configured to run the automated test suite and independent
+container smoke tests for both applications without live model inference.
+
+See [Testing, CI and model evaluation](docs/evaluation.md) for commands,
+detailed results and evaluation methodology.
 
 ## System scope and design boundaries
 
