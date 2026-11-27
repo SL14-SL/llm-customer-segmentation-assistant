@@ -68,7 +68,7 @@ jobs:
       - name: Build application
         run: docker build -t customer-analytics-demo .
 
-      - name: Start Text-to-SQL demo without model inference
+      - name: Start Text-to-SQL demo
         if: matrix.demo == 'text-to-sql'
         run: |
           docker run -d --name app-demo \
@@ -77,12 +77,12 @@ jobs:
             -e SYNTHETIC_DEMO=1 \
             customer-analytics-demo sh -c \
             'python -m customer_segmentation_assistant.demo.text_to_sql &&
-             exec streamlit run streamlit_app.py
-             --server.address=0.0.0.0
-             --server.port=8502
-             --server.headless=true'
+             exec streamlit run streamlit_app.py \
+               --server.address=0.0.0.0 \
+               --server.port=8502 \
+               --server.headless=true'
 
-      - name: Start comparison demo without model inference
+      - name: Start comparison demo
         if: matrix.demo == 'comparison'
         run: |
           docker run -d --name app-demo \
@@ -96,77 +96,20 @@ jobs:
       - name: Wait for application health
         env:
           APP_PORT: ${{ matrix.port }}
-        run: |
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent \
-              "http://localhost:${APP_PORT}/_stcore/health"; then
-              echo "Application is healthy."
-              exit 0
-            fi
-
-            sleep 2
-          done
-
-          docker logs app-demo
-          exit 1
+        run: bash scripts/smoke/wait_for_health.sh "$APP_PORT"
 
       - name: Verify Text-to-SQL demo data
         if: matrix.demo == 'text-to-sql'
-        run: >-
-          docker exec app-demo python -c
-          "from customer_segmentation_assistant.storage.database import query_dataframe;
-          assert query_dataframe('SELECT COUNT(*) FROM customers').iloc[0, 0] == 300"
+        run: |
+          docker exec -i app-demo python - \
+            < scripts/smoke/verify_text_to_sql.py
 
       - name: Verify comparison tools and computed report
         if: matrix.demo == 'comparison'
         run: |
-          docker exec -i app-demo python - <<'PY'
-          from pathlib import Path
-
-          from customer_segmentation_assistant.comparison.agent import (
-              run_comparison,
-          )
-          from customer_segmentation_assistant.demo.comparison import (
-              create_demo_database,
-          )
-
-          database = Path("/app/data/agent_demo.duckdb")
-          create_demo_database(database)
-
-          def deterministic_planner(context):
-              remaining = context["remaining_contracts"]
-
-              if remaining:
-                  return {
-                      "kind": "tool_call",
-                      "contract": remaining[0],
-                  }
-
-              return {"kind": "finish"}
-
-          result = run_comparison(
-              contracts=("Month-to-month", "One year"),
-              minimum_churn_probability=0.7,
-              database=database,
-              max_tool_calls=4,
-              planner=deterministic_planner,
-          )
-
-          assert result["tool_calls"] == 2
-
-          observations = {
-              item["result"]["contract"]: item["result"]
-              for item in result["observations"]
-          }
-
-          assert observations["Month-to-month"]["customer_count"] == 2
-          assert observations["One year"]["customer_count"] == 1
-
-          assert "Month-to-month" in result["answer"]
-          assert "One year" in result["answer"]
-
-          print("Comparison tools and computed report verified.")
-          PY
+          docker exec -i app-demo python - \
+            --database /app/data/smoke_comparison.duckdb \
+            < scripts/smoke/verify_comparison.py
 
       - name: Container logs
         if: always()
