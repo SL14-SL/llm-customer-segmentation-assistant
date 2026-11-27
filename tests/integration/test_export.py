@@ -2,6 +2,7 @@
 
 import pandas as pd
 import pytest
+
 from customer_segmentation_assistant.storage.export import export_csv
 
 

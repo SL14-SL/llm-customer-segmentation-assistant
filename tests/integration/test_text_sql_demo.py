@@ -4,9 +4,9 @@ import re
 
 import duckdb
 import pytest
-from customer_segmentation_assistant.storage.database import query_dataframe
 
 from customer_segmentation_assistant.demo.text_to_sql import create_text_sql_demo
+from customer_segmentation_assistant.storage.database import query_dataframe
 from customer_segmentation_assistant.text_to_sql.prompts import SYSTEM_PROMPT
 
 

@@ -2,6 +2,7 @@
 
 import duckdb
 import pytest
+
 from customer_segmentation_assistant.storage.database import query_dataframe
 
 
